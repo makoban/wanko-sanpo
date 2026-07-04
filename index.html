@@ -48,7 +48,40 @@
     content:"🌼"; position:absolute; top:-14px; right:24px; font-size:26px;
     transform:rotate(14deg);
   }
-  #stage{ position:relative; width:100%; border-radius:14px; overflow:hidden; background:#8ecf6f; }
+  #stage{
+    position:relative; width:100%; border-radius:14px; overflow:hidden; background:#8ecf6f;
+    touch-action:none; -webkit-user-select:none; user-select:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #stickBase, #stickKnob{
+    position:absolute; border-radius:50%; pointer-events:none; display:none; z-index:6;
+    transform:translate(-50%,-50%);
+  }
+  #stickBase{
+    width:84px; height:84px;
+    background:rgba(255,255,255,.22); border:2px solid rgba(255,255,255,.65);
+  }
+  #stickKnob{
+    width:38px; height:38px;
+    background:rgba(255,255,255,.88); box-shadow:0 2px 8px rgba(120,70,90,.35);
+  }
+  #act{
+    position:absolute; right:16px; bottom:16px; z-index:5;
+    width:64px; height:64px; border-radius:50%; border:none;
+    background:rgba(255,255,255,.88); font-size:30px;
+    box-shadow:0 4px 0 rgba(180,110,140,.5);
+    display:none; align-items:center; justify-content:center;
+  }
+  #act:active{ transform:scale(.92); }
+  .hint-sp{ display:none; }
+  @media (pointer:coarse){
+    #act{ display:flex; }
+    .hint-pc{ display:none; }
+    .hint-sp{ display:block; }
+  }
+  body.touch #act{ display:flex; }
+  body.touch .hint-sp{ display:block; }
+  body.touch .hint-pc{ display:none; }
   canvas#game{
     display:block; width:100%;
     image-rendering:pixelated; image-rendering:crisp-edges;
@@ -85,11 +118,17 @@
     <canvas id="game" width="320" height="240"></canvas>
     <canvas id="ui"></canvas>
     <button id="mute" title="おんがく">🔇</button>
+    <div id="stickBase"></div>
+    <div id="stickKnob"></div>
+    <button id="act" title="アクション">🐾</button>
   </div>
 </div>
 
-<p class="hint">
+<p class="hint hint-pc">
   🎮 <b>やじるしキー / WASD</b>：あるく　　🖐 <b>スペース</b>：はなす ・ なでる ・ きをゆらす ・ つりをする ・ むしをとる
+</p>
+<p class="hint hint-sp">
+  📱 <b>ゆびで ドラッグ</b>：あるく　　🐾 <b>ポンと タップ</b>：はなす ・ なでる ・ とる
 </p>
 
 <script>
@@ -125,6 +164,71 @@ window.addEventListener("keyup", e=>{
   if(e.key.length===1) keys[e.key.toLowerCase()] = false;
 });
 document.addEventListener("pointerdown", initAudio);
+
+/* --- タッチ操作（スマホ）：ドラッグ＝スティック / タップ＝アクション --- */
+const stage = document.getElementById("stage");
+const stickBase = document.getElementById("stickBase");
+const stickKnob = document.getElementById("stickKnob");
+const actBtn = document.getElementById("act");
+let touchId = null, touchOrigin = null, touchMoved = false, touchT0 = 0;
+const touchVec = {x:0, y:0};
+function stagePos(t){
+  const r = stage.getBoundingClientRect();
+  return [t.clientX - r.left, t.clientY - r.top];
+}
+function placeStick(bx,by,kx,ky){
+  stickBase.style.left = bx+"px"; stickBase.style.top = by+"px";
+  stickKnob.style.left = kx+"px"; stickKnob.style.top = ky+"px";
+}
+stage.addEventListener("touchstart", e=>{
+  if(e.target === muteBtn) return;          /* 音楽ボタンは通常動作 */
+  document.body.classList.add("touch");
+  initAudio();
+  for(const t of e.changedTouches){
+    if(t.target === actBtn){ actPressed = true; continue; }
+    if(touchId === null){
+      touchId = t.identifier;
+      touchMoved = false; touchT0 = performance.now();
+      const [x,y] = stagePos(t);
+      touchOrigin = [x,y];
+      stickBase.style.display = stickKnob.style.display = "block";
+      placeStick(x,y,x,y);
+    }else{
+      actPressed = true;                    /* 2本目の指はアクション */
+    }
+  }
+  e.preventDefault();
+}, {passive:false});
+stage.addEventListener("touchmove", e=>{
+  for(const t of e.changedTouches){
+    if(t.identifier !== touchId) continue;
+    const [x,y] = stagePos(t);
+    const dx = x-touchOrigin[0], dy = y-touchOrigin[1];
+    const len = Math.hypot(dx,dy);
+    if(len > 12) touchMoved = true;
+    if(len < 10){
+      touchVec.x = 0; touchVec.y = 0;
+      placeStick(touchOrigin[0], touchOrigin[1], x, y);
+      continue;
+    }
+    const ux = dx/len, uy = dy/len;
+    touchVec.x = ux; touchVec.y = uy;
+    const cl = Math.min(len, 42);
+    placeStick(touchOrigin[0], touchOrigin[1], touchOrigin[0]+ux*cl, touchOrigin[1]+uy*cl);
+  }
+  e.preventDefault();
+}, {passive:false});
+function touchEnd(e){
+  for(const t of e.changedTouches){
+    if(t.identifier !== touchId) continue;
+    if(!touchMoved && performance.now()-touchT0 < 300) actPressed = true;  /* タップ＝アクション */
+    touchId = null; touchVec.x = 0; touchVec.y = 0;
+    stickBase.style.display = stickKnob.style.display = "none";
+  }
+  e.preventDefault();
+}
+stage.addEventListener("touchend", touchEnd, {passive:false});
+stage.addEventListener("touchcancel", touchEnd, {passive:false});
 
 /* ================= ユーティリティ ================= */
 function h32(x,y){
@@ -826,11 +930,13 @@ function update(dt){
     if(keys["ArrowRight"]||keys["d"]) vx=1;
     if(keys["ArrowUp"]||keys["w"]) vy=-1;
     if(keys["ArrowDown"]||keys["s"]) vy=1;
+    if(!vx && !vy){ vx = touchVec.x; vy = touchVec.y; }
   }
   if(fishing && (vx||vy)) fishing = null;
   const sp = 78*dt;
-  if(vx&&vy){ vx*=0.707; vy*=0.707; }
-  player.moving = !!(vx||vy);
+  const vlen = Math.hypot(vx,vy);
+  if(vlen > 1){ vx/=vlen; vy/=vlen; }
+  player.moving = vlen > 0.05;
   if(player.moving){
     if(Math.abs(vx)>Math.abs(vy)) player.dir = vx>0?"right":"left";
     else if(vy) player.dir = vy>0?"down":"up";
