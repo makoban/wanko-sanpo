@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>わんこさんぽ 🐕</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐕</text></svg>">
+<style>
+  :root{
+    --pink:#ff8fae; --cream:#fff8ef;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    min-height:100vh;
+    display:flex; flex-direction:column; align-items:center;
+    padding:18px 12px 30px;
+    font-family:'Hiragino Maru Gothic ProN','Yu Gothic','Meiryo',sans-serif;
+    background:
+      radial-gradient(circle at 12% 20%, rgba(255,255,255,.55) 0 6px, transparent 7px),
+      radial-gradient(circle at 78% 60%, rgba(255,255,255,.5) 0 5px, transparent 6px),
+      radial-gradient(circle at 40% 85%, rgba(255,255,255,.5) 0 4px, transparent 5px),
+      linear-gradient(160deg,#ffe9f2 0%, #fff6de 45%, #e2f6ff 100%);
+    background-attachment: fixed;
+  }
+  h1{
+    font-size:clamp(26px,5vw,40px);
+    color:#7a4a2f;
+    letter-spacing:.12em;
+    text-shadow:0 3px 0 #fff, 0 5px 0 rgba(255,143,174,.35);
+    margin-bottom:2px;
+  }
+  .sub{
+    color:#b0765a; font-size:14px; margin-bottom:14px; letter-spacing:.15em;
+  }
+  #frame{
+    position:relative;
+    width:min(92vw, 900px);
+    border-radius:22px;
+    padding:10px;
+    background:linear-gradient(#ffd3e2,#ffc2d6);
+    box-shadow:0 10px 0 rgba(214,120,150,.45), 0 22px 40px rgba(160,90,120,.25);
+  }
+  #frame::before{
+    content:"🐾"; position:absolute; top:-14px; left:24px; font-size:26px;
+    transform:rotate(-16deg);
+  }
+  #frame::after{
+    content:"🌼"; position:absolute; top:-14px; right:24px; font-size:26px;
+    transform:rotate(14deg);
+  }
+  #stage{ position:relative; width:100%; border-radius:14px; overflow:hidden; background:#8ecf6f; }
+  canvas#game{
+    display:block; width:100%;
+    image-rendering:pixelated; image-rendering:crisp-edges;
+  }
+  canvas#ui{
+    position:absolute; inset:0; width:100%; height:100%;
+    pointer-events:none;
+  }
+  #mute{
+    position:absolute; right:18px; top:18px; z-index:5;
+    border:none; cursor:pointer;
+    width:44px; height:44px; border-radius:50%;
+    font-size:20px; background:rgba(255,255,255,.9);
+    box-shadow:0 3px 0 rgba(180,110,140,.5);
+    transition:transform .1s;
+  }
+  #mute:active{ transform:scale(.9); }
+  .hint{
+    margin-top:16px; color:#8a5f47; font-size:14px;
+    background:rgba(255,255,255,.7);
+    padding:10px 20px; border-radius:999px;
+    box-shadow:0 3px 0 rgba(200,150,120,.25);
+    text-align:center; line-height:1.9;
+  }
+  .hint b{ color:#e0648d; }
+</style>
+</head>
+<body>
+<h1>🐕 わんこさんぽ 🌸</h1>
+<p class="sub">〜 いぬと いっしょに のんびり おさんぽ 〜</p>
+
+<div id="frame">
+  <div id="stage">
+    <canvas id="game" width="320" height="240"></canvas>
+    <canvas id="ui"></canvas>
+    <button id="mute" title="おんがく">🔇</button>
+  </div>
+</div>
+
+<p class="hint">
+  🎮 <b>やじるしキー / WASD</b>：あるく　　🖐 <b>スペース</b>：はなす ・ なでる ・ きをゆらす ・ つりをする ・ むしをとる
+</p>
+
+<script>
+"use strict";
+/* ================= 基本セットアップ ================= */
+const T = 16, MW = 40, MH = 30, VW = 320, VH = 240;
+const cvs = document.getElementById("game");
+const ctx = cvs.getContext("2d");
+ctx.imageSmoothingEnabled = false;
+const ui = document.getElementById("ui");
+const uictx = ui.getContext("2d");
+
+function fitUI(){
+  const r = cvs.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  ui.width  = Math.round(r.width  * dpr);
+  ui.height = Math.round(r.height * dpr);
+}
+window.addEventListener("resize", fitUI);
+
+/* ================= 入力 ================= */
+const keys = {};
+let actPressed = false;
+window.addEventListener("keydown", e=>{
+  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ","Spacebar"].includes(e.key)) e.preventDefault();
+  if((e.key===" "||e.key==="Spacebar") && !keys[" "]) actPressed = true;
+  keys[e.key] = true;
+  if(e.key.length===1) keys[e.key.toLowerCase()] = true;
+  initAudio();
+});
+window.addEventListener("keyup", e=>{
+  keys[e.key] = false;
+  if(e.key.length===1) keys[e.key.toLowerCase()] = false;
+});
+document.addEventListener("pointerdown", initAudio);
+
+/* ================= ユーティリティ ================= */
+function h32(x,y){
+  let n = (x*374761393 + y*668265263) | 0;
+  n = ((n ^ (n>>>13)) * 1274126177) | 0;
+  return ((n ^ (n>>>16)) >>> 0);
+}
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const dist = (ax,ay,bx,by)=>Math.hypot(ax-bx, ay-by);
+
+/* ================= ドット絵スプライト ================= */
+const PAL = {
+  K:"#4a3228", H:"#a06a45", S:"#ffdcc2", E:"#33241f",
+  P:"#ff8fae", D:"#e86e97", W:"#ffffff", R:"#c9575c", o:"#ffb3c0",
+  O:"#e8a45e", C:"#fff3e0", N:"#3a2a24",
+  G:"#9aa0b4", B:"#6db4e8", Y:"#f5d259", n:"#f08a9b"
+};
+function spr(rows, extra){
+  const pal = extra ? Object.assign({}, PAL, extra) : PAL;
+  const w = rows[0].length, h = rows.length;
+  for(const r of rows) if(r.length !== w) console.warn("sprite width mismatch:", r);
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const g = c.getContext("2d");
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const ch = rows[y][x];
+    if(ch === ".") continue;
+    g.fillStyle = pal[ch] || "#f0f";
+    g.fillRect(x,y,1,1);
+  }
+  return c;
+}
+function flip(c){
+  const f = document.createElement("canvas");
+  f.width = c.width; f.height = c.height;
+  const g = f.getContext("2d");
+  g.translate(c.width,0); g.scale(-1,1);
+  g.drawImage(c,0,0);
+  return f;
+}
+
+/* --- 女の子（12x16） --- */
+const GIRL_DOWN_A = spr([
+"...KKKKKK...",
+"..KHHHHHHK..",
+".KHHHHHHHHK.",
+".KHHHHHHHHK.",
+".KHSSSSSSHK.",
+".KHSESSESHK.",
+".KHSSSSSSHK.",
+"..KSoSSoSK..",
+"...KPPPPK...",
+"..KPPPPPPK..",
+".KSPPPPPPSK.",
+".KSPPPPPPSK.",
+"..KPPPPPPK..",
+"..KDDDDDDK..",
+"...SS..SS...",
+"...RR..RR..."]);
+const GIRL_DOWN_B = spr([
+"...KKKKKK...",
+"..KHHHHHHK..",
+".KHHHHHHHHK.",
+".KHHHHHHHHK.",
+".KHSSSSSSHK.",
+".KHSESSESHK.",
+".KHSSSSSSHK.",
+"..KSoSSoSK..",
+"...KPPPPK...",
+"..KPPPPPPK..",
+".KSPPPPPPSK.",
+".KSPPPPPPSK.",
+"..KPPPPPPK..",
+"..KDDDDDDK..",
+"..SS....SS..",
+"..RR....RR.."]);
+const GIRL_UP_A = spr([
+"...KKKKKK...",
+"..KHHHHHHK..",
+".KHHHHHHHHK.",
+".KHHWWHHHHK.",
+".KHHWWHHHHK.",
+".KHHHHHHHHK.",
+".KHHHHHHHHK.",
+"..KHHHHHHK..",
+"...KPPPPK...",
+"..KPPPPPPK..",
+".KSPPPPPPSK.",
+".KSPPPPPPSK.",
+"..KPPPPPPK..",
+"..KDDDDDDK..",
+"...SS..SS...",
+"...RR..RR..."]);
+const GIRL_UP_B = spr([
+"...KKKKKK...",
+"..KHHHHHHK..",
+".KHHHHHHHHK.",
+".KHHWWHHHHK.",
+".KHHWWHHHHK.",
+".KHHHHHHHHK.",
+".KHHHHHHHHK.",
+"..KHHHHHHK..",
+"...KPPPPK...",
+"..KPPPPPPK..",
+".KSPPPPPPSK.",
+".KSPPPPPPSK.",
+"..KPPPPPPK..",
+"..KDDDDDDK..",
+"..SS....SS..",
+"..RR....RR.."]);
+const GIRL_R_A = spr([
+"...KKKKKK...",
+"..KHHHHHHK..",
+".KHHHHHHHHK.",
+".KHHHHHHHHK.",
+".KHHHSSSSK..",
+".KHHHSSESK..",
+".KHHHSSSSK..",
+"..KHHSooSK..",
+"...KPPPPK...",
+"..KPPPPPPK..",
+"..KPPSSPPK..",
+"..KPPSSPPK..",
+"..KPPPPPPK..",
+"..KDDDDDDK..",
+"....SS.SS...",
+"....RR.RR..."]);
+const GIRL_R_B = spr([
+"...KKKKKK...",
+"..KHHHHHHK..",
+".KHHHHHHHHK.",
+".KHHHHHHHHK.",
+".KHHHSSSSK..",
+".KHHHSSESK..",
+".KHHHSSSSK..",
+"..KHHSooSK..",
+"...KPPPPK...",
+"..KPPPPPPK..",
+"..KPPSSPPK..",
+"..KPPSSPPK..",
+"..KPPPPPPK..",
+"..KDDDDDDK..",
+"...SS...SS..",
+"...RR...RR.."]);
+const GIRL = {
+  down:[GIRL_DOWN_A, GIRL_DOWN_B],
+  up:  [GIRL_UP_A, GIRL_UP_B],
+  right:[GIRL_R_A, GIRL_R_B],
+  left:[flip(GIRL_R_A), flip(GIRL_R_B)]
+};
+
+/* --- わんちゃん（16x12・右向き / しっぽは別描き） --- */
+const DOG_R_A = spr([
+"..........KK.KK.",
+"..........KOKKOK",
+"..........KOOOOK",
+".........KOOOOOK",
+"...KKKKKKOOOEOOK",
+"..KOOOOOOOOOOCCK",
+"..KOOOOOOOOCCNK.",
+".KOOOCCCCCOOOK..",
+".KOOCCCCCCOOOK..",
+".KOOKOOOOOKOOK..",
+"..KOK....KOK....",
+"..KK......KK...."]);
+const DOG_R_B = spr([
+"..........KK.KK.",
+"..........KOKKOK",
+"..........KOOOOK",
+".........KOOOOOK",
+"...KKKKKKOOOEOOK",
+"..KOOOOOOOOOOCCK",
+"..KOOOOOOOOCCNK.",
+".KOOOCCCCCOOOK..",
+".KOOCCCCCCOOOK..",
+".KOOKOOOOOKOOK..",
+".KOK......KOK...",
+".KK........KK..."]);
+const DOG = {
+  right:[DOG_R_A, DOG_R_B],
+  left:[flip(DOG_R_A), flip(DOG_R_B)]
+};
+
+/* --- PNGスプライトシート読み込み（sprites/*.png）--- */
+/* 3x3グリッド：行1=正面 行2=背面 行3=左向き。右向きは反転生成。 */
+/* 読み込み失敗時は上のコード内蔵ドット絵のまま動く。 */
+const SPR = {};
+function sliceSheet(img, facesLeft){
+  const cell = img.width/3;
+  const off = document.createElement("canvas");
+  off.width = img.width; off.height = img.height;
+  const g = off.getContext("2d");
+  g.drawImage(img,0,0);
+  let data = null;
+  try{ data = g.getImageData(0,0,img.width,img.height).data; }catch(e){}
+  const rows = [];
+  for(let r=0;r<3;r++){
+    const row = [];
+    for(let c=0;c<3;c++){
+      let x0=0, y0=0, x1=cell-1, y1=cell-1;
+      if(data){
+        x0=cell; y0=cell; x1=-1; y1=-1;
+        for(let y=0;y<cell;y++) for(let x=0;x<cell;x++){
+          const a = data[(((r*cell+y)*img.width)+(c*cell+x))*4+3];
+          if(a>=128){
+            if(x<x0)x0=x; if(x>x1)x1=x;
+            if(y<y0)y0=y; if(y>y1)y1=y;
+          }
+        }
+        if(x1<0){ x0=0;y0=0;x1=cell-1;y1=cell-1; }
+      }
+      const w=x1-x0+1, h=y1-y0+1;
+      const cv = document.createElement("canvas");
+      cv.width=w; cv.height=h;
+      const cg = cv.getContext("2d");
+      cg.imageSmoothingEnabled = false;
+      cg.drawImage(img, c*cell+x0, r*cell+y0, w,h, 0,0, w,h);
+      row.push({c:cv, w, h});
+    }
+    rows.push(row);
+  }
+  const raw = rows[2];
+  const flipped = rows[2].map(f=>({c:flip(f.c), w:f.w, h:f.h}));
+  return {
+    down: rows[0], up: rows[1],
+    side:  facesLeft ? raw : flipped,   /* 左向き */
+    sideR: facesLeft ? flipped : raw    /* 右向き */
+  };
+}
+const SHEET_NAMES = ["girl","dog","moka","mike","kerota","penta","tonko","meeko","mimii","noron"];
+const ROW3_FACES_LEFT = { dog:true };   /* 3行目が左向きのシート（他は右向き） */
+for(const n of SHEET_NAMES){
+  const im = new Image();
+  im.onload = ()=>{
+    SPR[n] = sliceSheet(im, !!ROW3_FACES_LEFT[n]);
+    if(typeof VILLAGERS !== "undefined"){
+      for(const v of VILLAGERS) if(v.key===n) v.h = SPR[n].down[0].h;
+    }
+  };
+  im.src = "sprites/" + n + ".png";
+}
+
+/* --- 野生のいきもの --- */
+const BIRD = spr([
+"..KKKK..",
+".KBBBBK.",
+"nKBEBBBK",
+".KBBWBBK",
+".KBBBBK.",
+"..KKKK..",
+"...K.K.."]);
+const DUCK = spr([
+"...KKK......",
+"..KYYYK.....",
+"nnKYEYK.....",
+"..KYYYK.....",
+"..KYYYYKKK..",
+".KYYYYYYYYK.",
+".KYYWWYYYYK.",
+"..KYYYYYYK..",
+"...KKKKKK..."]);
+
+/* ================= どうぶつの住民（どう森風ちびキャラ） ================= */
+/* 頭（種族ごと）＋からだ（服）を合成。s=毛色 m=マズル T/t=服 */
+const BODY_A = [
+"..KTTTTTTK..",
+".KsTttttTsK.",
+".KsTTTTTTsK.",
+"..KttttttK..",
+"...ss..ss...",
+"...ss..ss...",
+"...KK..KK..."];
+const BODY_B = [
+"..KTTTTTTK..",
+".KsTttttTsK.",
+".KsTTTTTTsK.",
+"..KttttttK..",
+"..ss....ss..",
+"..ss....ss..",
+"..KK....KK.."];
+
+const HEAD_BEAR = [
+".KK......KK.",
+"KssK....KssK",
+".KssssssssK.",
+"KssssssssssK",
+"KssEssssEssK",
+"KssEssssEssK",
+"KsssmmmmsssK",
+"KssmmNNmmssK",
+".KssmmmmssK.",
+".KssssssssK.",
+"..KKKKKKKK.."];
+const HEAD_CAT = [
+".KK......KK.",
+"KsPK....KPsK",
+"KssssssssssK",
+"KssEssssEssK",
+"KssEssssEssK",
+"KssWWWWWWssK",
+"KssWWnnWWssK",
+".KssWWWWssK.",
+".KssssssssK.",
+"..KKKKKKKK.."];
+const HEAD_FROG = [
+"..KK....KK..",
+".KWEK..KEWK.",
+"KssssssssssK",
+"KssssssssssK",
+"KssssssssssK",
+"KssKKKKKKssK",
+".KsWWWWWWsK.",
+".KssssssssK.",
+"..KKKKKKKK.."];
+const HEAD_PENGUIN = [
+"...KKKKKK...",
+"..KssssssK..",
+".KssssssssK.",
+"KssWWWWWWssK",
+"KsWWEWWEWWsK",
+"KsWWWnnWWWsK",
+"KssWWWWWWssK",
+".KssWWWWssK.",
+".KssssssssK.",
+"..KKKKKKKK.."];
+const HEAD_PIG = [
+".KK......KK.",
+"KssK....KssK",
+".KssssssssK.",
+"KssssssssssK",
+"KssEssssEssK",
+"KsssmmmmsssK",
+"KssmNmmNmssK",
+"KsssmmmmsssK",
+".KssssssssK.",
+"..KKKKKKKK.."];
+const HEAD_SHEEP = [
+".KKKKKKKKKK.",
+"KssssssssssK",
+"KssmmmmmmssK",
+"KssmEmmEmssK",
+"KssmmNNmmssK",
+"KssmmmmmmssK",
+".KssssssssK.",
+"..KKKKKKKK.."];
+const HEAD_RABBIT = [
+".KK......KK.",
+".KsPK..KPsK.",
+".KsPK..KPsK.",
+".KssssssssK.",
+"KssssssssssK",
+"KssEssssEssK",
+"KssssnnssssK",
+".KssssssssK.",
+"..KKKKKKKK.."];
+const HEAD_DEER = [
+".k.k....k.k.",
+"..kk....kk..",
+".KssssssssK.",
+"KssssssssssK",
+"KssEssssEssK",
+"KsssmmmmsssK",
+"KssmmNNmmssK",
+".KssmmmmssK.",
+".KssssssssK.",
+"..KKKKKKKK.."];
+
+function makeVillager(head, pal){
+  return [ spr(head.concat(BODY_A), pal), spr(head.concat(BODY_B), pal) ];
+}
+const VILLAGERS = [
+  { name:"モカ", key:"moka", tag:"#c98b4e",
+    img: makeVillager(HEAD_BEAR, {s:"#b48a5a", m:"#e0c39a", T:"#e0575f", t:"#f2888e"}),
+    hx:6.5*T, hy:13.2*T, pitch:300,
+    lines:["やあ！ きょうも いい てんき だべあ〜","わんちゃんと おさんぽ？ いいなあ、だべあ","はちみつトースト たべたいべあ… じゅるり"] },
+  { name:"ミケ", key:"mike", tag:"#e8a24e",
+    img: makeVillager(HEAD_CAT, {s:"#f2b264", T:"#4f9c3d", t:"#6fbf5b"}),
+    hx:16.5*T, hy:13.3*T, pitch:680,
+    lines:["ひなたで ひるね するのが すきなの にゃ〜","おさかな つったら みせて ほしいにゃん！","この まち、のんびり してて いいよね にゃ"] },
+  { name:"ケロた", key:"kerota", tag:"#5daf3f",
+    img: makeVillager(HEAD_FROG, {s:"#8fd06c", T:"#ffd166", t:"#ffe08c"}),
+    hx:26.8*T, hy:19.5*T, pitch:460,
+    lines:["いけの みずが きもちいい ケロ〜","あめの ひも わりと すき ケロ！","ぴょーんと ジャンプ、みてて ケロ！"] },
+  { name:"ペンタ", key:"penta", tag:"#5b8dd6",
+    img: makeVillager(HEAD_PENGUIN, {s:"#6b9bd0", n:"#f0a050", T:"#e0575f", t:"#ffffff"}),
+    hx:31.5*T, hy:26.5*T, pitch:560,
+    lines:["さかな つれたら じまん しにきて ペン！","なつでも セーター、だって おしゃれ ペン","いつか うみを みてみたい ペン〜"] },
+  { name:"トンこ", key:"tonko", tag:"#e88ba8",
+    img: makeVillager(HEAD_PIG, {s:"#f5b8c9", m:"#fac9d6", T:"#5b8dd6", t:"#7fabe0"}),
+    hx:23.5*T, hy:16.3*T, pitch:620,
+    lines:["おはなばたけの におい、しあわせ ぶひ〜","おやつの じかんは まだかな ぶひ？","きみの わんちゃん、かわいい ぶひね！"] },
+  { name:"メエこ", key:"meeko", tag:"#b48ee0",
+    img: makeVillager(HEAD_SHEEP, {s:"#f7f0dd", m:"#e8c39a", T:"#c58bf2", t:"#d8aef7"}),
+    hx:27.5*T, hy:9.5*T, pitch:520,
+    lines:["この もこもこ、さわってみる？ メェ〜","ベンチで ひなたぼっこ さいこう メェ","セーターは じぶんで あんだの メェ！"] },
+  { name:"ミミィ", key:"mimii", tag:"#f088a8",
+    img: makeVillager(HEAD_RABBIT, {s:"#ffffff", T:"#ff8fae", t:"#ffc2d6"}),
+    hx:13.5*T, hy:18.5*T, pitch:760,
+    lines:["ぴょんぴょん きょうそう しない？","にんじんの はたけ、つくりたいなあ","さくらの はなびら、きれいだね！"] },
+  { name:"ノロん", key:"noron", tag:"#a8763e",
+    img: makeVillager(HEAD_DEER, {s:"#d9a066", m:"#f2d8b0", k:"#8a5a3a", T:"#3f6d6a", t:"#5f8d8a"}),
+    hx:20.8*T, hy:8.3*T, pitch:400,
+    lines:["もりの おくに ひみつの はなばたけが あるんだ","つの、ちょっと じまんなんだ","しずかな よるは ほしが きれいだよ"] }
+];
+for(const v of VILLAGERS){
+  v.x = v.hx; v.y = v.hy;
+  v.state = "idle"; v.wt = Math.random()*2; v.tx = v.x; v.ty = v.y;
+  v.lineI = 0; v.walkT = 0;
+  v.h = v.img[0].height; v.face = "down";
+  if(SPR[v.key]) v.h = SPR[v.key].down[0].h;
+}
+
+/* ================= マップ生成 ================= */
+const ground = [], solid = [];
+for(let y=0;y<MH;y++){ ground.push(new Array(MW).fill("g")); solid.push(new Array(MW).fill(false)); }
+function setPath(x,y){ if(x>=0&&y>=0&&x<MW&&y<MH && ground[y][x]!=="w") ground[y][x]="p"; }
+
+for(let x=2;x<38;x++){ setPath(x,14); setPath(x,15); }
+for(let y=3;y<28;y++){ setPath(18,y); setPath(19,y); }
+for(let x=5;x<28;x++){ setPath(x,24); setPath(x,25); }
+for(let y=12;y<14;y++) setPath(7,y);
+for(let y=8;y<14;y++)  setPath(27,y);
+setPath(12,23);
+
+/* 池 */
+for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){
+  const dx=(x-32.3)/4.3, dy=(y-21.3)/3.1;
+  if(dx*dx+dy*dy<=1){ ground[y][x]="w"; solid[y][x]=true; }
+}
+/* おはな */
+for(const fx of [4,9,13,23,29,33]){
+  if(ground[13][fx]==="g") ground[13][fx]="f";
+  if(ground[16][fx]==="g") ground[16][fx]="f";
+}
+for(let y=17;y<19;y++) for(let x=22;x<25;x++) if(ground[y][x]==="g") ground[y][x]="f";
+
+/* オブジェクト */
+const houses = [
+  {tx:5,  ty:8,  roof:"#e0575f", roofD:"#b8404c"},
+  {tx:25, ty:4,  roof:"#5b8dd6", roofD:"#4470b0"},
+  {tx:10, ty:19, roof:"#5fae6e", roofD:"#478a56"}
+];
+const trees = [];
+function addTree(tx,ty,cherry){
+  if(ground[ty][tx]!=="g" && ground[ty][tx]!=="f") return;
+  trees.push({tx,ty,cherry:!!cherry, fruit:false, fruitN:0, regrowT:0, shakeT:0, pendingDrop:0});
+  solid[ty][tx]=true;
+}
+for(let x=2;x<38;x+=3) addTree(x,1);
+for(let x=3;x<38;x+=3) addTree(x,28);
+for(let y=4;y<27;y+=3){ addTree(1,y); addTree(38,y); }
+[[14,7],[31,10],[6,17],[33,8],[24,20]].forEach(p=>addTree(p[0],p[1]));
+[[15,11],[23,11],[28,17]].forEach(p=>addTree(p[0],p[1],true));
+/* りんごの木 */
+const FRUIT_SPOTS = new Set(["14,7","31,10","6,17","33,8","24,20"]);
+for(const tr of trees){
+  if(FRUIT_SPOTS.has(tr.tx+","+tr.ty)){ tr.fruit = true; tr.fruitN = 3; }
+}
+
+const bushes = [[3,13],[35,13],[21,7],[9,26],[30,27]];
+bushes.forEach(b=>{ if(!solid[b[1]][b[0]] && ground[b[1]][b[0]]!=="p"){ solid[b[1]][b[0]]=true; } });
+const bench = {tx:21, ty:12};
+solid[12][21]=true; solid[12][22]=true;
+const lamps = [[17,12],[20,16],[26,23]];
+lamps.forEach(l=>{ solid[l[1]][l[0]]=true; });
+
+for(const h of houses){
+  for(let y=h.ty+2;y<h.ty+4;y++) for(let x=h.tx;x<h.tx+4;x++) solid[y][x]=true;
+}
+
+/* ================= キャラクター ================= */
+const player = { x:18.2*T, y:16.5*T, dir:"down", moving:false, frame:0, animT:0, idleT:0 };
+const dog = { x:player.x-18, y:player.y+4, face:"l", mode:"side", moving:false, frame:0, animT:0,
+              happyT:0, wagPhase:0, sayT:0, jumpT:0 };
+const trail = [];
+let lastTrail = {x:player.x, y:player.y};
+let petCount = 0;
+const pocket = { apple:0, fish:0, bug:0 };
+
+const critters = [
+  {img:BIRD, x:13.3*T, y:17.2*T, msg:"ちゅん ちゅん♪", phase:4},
+  {img:DUCK, x:31*T,   y:21*T,   msg:"があ があ〜", phase:1, duck:true, ang:0}
+];
+
+/* ================= 会話・アクション状態 ================= */
+let dialog = null;    /* {v, text, chars} */
+let fishing = null;   /* {bx,by,t,biteT,state,hookT} */
+let popup = null;     /* {text,t} */
+const floatTexts = [];
+const groundItems = [];
+
+const FISH = [
+  ["フナ",34],["コイ",22],["キンギョ",16],["ニジマス",12],["ナマズ",9],["きんの さかな",4],["boot",3]
+];
+const BUG_NAMES = ["モンキチョウ","モンシロチョウ","ピンクの ちょうちょ"];
+
+/* ================= パーティクル ================= */
+const petals = [], hearts = [], butterflies = [], puffs = [];
+for(let i=0;i<3;i++){
+  const homes = [[23.5*T,17.5*T],[9*T,13*T],[29*T,16*T]];
+  butterflies.push({ x:homes[i][0], y:homes[i][1], hx:homes[i][0], hy:homes[i][1],
+    tx:homes[i][0], ty:homes[i][1], t:0, col:i===0?"#ffe066":i===1?"#ffffff":"#ffb3d9",
+    ph:i*2, kind:i, caughtT:0 });
+}
+const clouds = [
+  {x:60,  y:40,  s:1.2, v:3.5},
+  {x:420, y:150, s:0.9, v:2.6},
+  {x:250, y:330, s:1.1, v:3.0}
+];
+
+/* ================= サウンド ================= */
+let ac = null, master = null, delayN = null, muted = true;
+let nextNote = 0, noteI = 0;
+const MELODY = [69,72,74,76, 74,72,69,67, 69,72,76,74, 72,74,69,64];
+const muteBtn = document.getElementById("mute");
+function initAudio(){
+  if(ac) return;
+  try{
+    ac = new (window.AudioContext||window.webkitAudioContext)();
+    master = ac.createGain(); master.gain.value = 0;
+    delayN = ac.createDelay(1); delayN.delayTime.value = 0.28;
+    const fb = ac.createGain(); fb.gain.value = 0.3;
+    const wet = ac.createGain(); wet.gain.value = 0.25;
+    delayN.connect(fb); fb.connect(delayN);
+    delayN.connect(wet); wet.connect(master);
+    master.connect(ac.destination);
+    nextNote = ac.currentTime + 0.3;
+  }catch(e){}
+}
+muteBtn.addEventListener("click", ()=>{
+  initAudio();
+  muted = !muted;
+  muteBtn.textContent = muted ? "🔇" : "🎵";
+  if(master) master.gain.linearRampToValueAtTime(muted?0:0.16, ac.currentTime+0.3);
+  if(ac && ac.state==="suspended") ac.resume();
+});
+function playNote(midi, t){
+  const f = 440*Math.pow(2,(midi-69)/12);
+  const o = ac.createOscillator(); o.type = "triangle"; o.frequency.value = f;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(0.5,t+0.02);
+  g.gain.exponentialRampToValueAtTime(0.001,t+0.55);
+  o.connect(g); g.connect(master); g.connect(delayN);
+  o.start(t); o.stop(t+0.6);
+}
+function tickMusic(){
+  if(!ac || muted) return;
+  while(nextNote < ac.currentTime + 0.25){
+    playNote(MELODY[noteI % MELODY.length], nextNote);
+    if(noteI % 4 === 0) playNote(MELODY[noteI % MELODY.length]-24, nextNote);
+    noteI++; nextNote += 0.34;
+  }
+}
+function sfx(type, freq, dur, vol, slideTo){
+  if(!ac) return;
+  if(ac.state==="suspended") ac.resume();
+  const t0 = ac.currentTime;
+  const o = ac.createOscillator(); o.type = type;
+  o.frequency.setValueAtTime(freq, t0);
+  if(slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0+dur);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.0001,t0);
+  g.gain.exponentialRampToValueAtTime(vol,t0+0.01);
+  g.gain.exponentialRampToValueAtTime(0.001,t0+dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(t0); o.stop(t0+dur+0.02);
+}
+function bark(){
+  sfx("square", 660, 0.08, 0.12, 460);
+  setTimeout(()=>sfx("square", 520, 0.08, 0.1, 380), 90);
+}
+function voiceBlip(pitch){
+  sfx("triangle", pitch*(0.85+Math.random()*0.35), 0.055, 0.06);
+}
+function jingle(){
+  if(!ac) return;
+  [72,76,81].forEach((m,i)=>{
+    setTimeout(()=>sfx("triangle", 440*Math.pow(2,(m-69)/12), 0.18, 0.1), i*90);
+  });
+}
+function popSound(){ sfx("triangle", 880, 0.07, 0.09, 1200); }
+function splash(){ sfx("sine", 320, 0.2, 0.08, 90); }
+
+/* ================= 当たり判定 ================= */
+function blocked(px,py){
+  const pts = [[px-5,py-2],[px+5,py-2],[px-5,py+4],[px+5,py+4]];
+  for(const [x,y] of pts){
+    const tx = Math.floor(x/T), ty = Math.floor(y/T);
+    if(tx<0||ty<0||tx>=MW||ty>=MH) return true;
+    if(solid[ty][tx]) return true;
+  }
+  return false;
+}
+
+/* ================= アクション ================= */
+function dirVec(){
+  return player.dir==="left"?[-1,0]:player.dir==="right"?[1,0]:player.dir==="up"?[0,-1]:[0,1];
+}
+function startDialog(v){
+  dialog = { v, text: v.lines[v.lineI % v.lines.length], chars:0, blipAt:0 };
+  v.lineI++; v.state = "idle"; v.wt = 2.5;
+}
+function startFishing(bx,by){
+  fishing = { bx, by, t:0, biteT:1.5+Math.random()*2.8, state:"wait", hookT:0 };
+  splash();
+}
+function endFishing(msg){
+  if(msg) floatTexts.push({x:player.x, y:player.y-18, text:msg, t:1.6});
+  fishing = null;
+}
+function pickWeighted(list){
+  let sum = 0; for(const f of list) sum += f[1];
+  let r = Math.random()*sum;
+  for(const f of list){ r -= f[1]; if(r<=0) return f[0]; }
+  return list[0][0];
+}
+function tryAction(){
+  if(dialog){
+    if(dialog.chars < dialog.text.length){ dialog.chars = dialog.text.length; }
+    else dialog = null;
+    return;
+  }
+  if(fishing){
+    if(fishing.state === "wait"){ endFishing("…なにも いないみたい"); }
+    else{
+      const got = pickWeighted(FISH);
+      pocket.fish++;
+      popup = { text: got==="boot" ? "👢 ながぐつを つりあげた！ …なんで？" : `🐟 ${got}を つりあげた！`, t:2.4 };
+      jingle();
+      fishing = null;
+    }
+    return;
+  }
+  /* ちかくの できることを さがす */
+  const cands = [];
+  for(const v of VILLAGERS){
+    const d = dist(player.x,player.y, v.x,v.y);
+    if(d < 26) cands.push({d:d*0.8, f:()=>startDialog(v)});
+  }
+  for(const b of butterflies){
+    if(b.caughtT > 0) continue;
+    const d = dist(player.x,player.y, b.x,b.y);
+    if(d < 18) cands.push({d:d*0.9, f:()=>{
+      if(Math.random() < 0.75){
+        pocket.bug++;
+        popup = { text:`🦋 ${BUG_NAMES[b.kind]}を つかまえた！`, t:2.4 };
+        jingle();
+        b.caughtT = 8;
+      }else{
+        floatTexts.push({x:b.x, y:b.y-8, text:"にげられた！", t:1.4});
+        b.tx = b.hx + (Math.random()*160-80); b.ty = b.hy + (Math.random()*100-50); b.t = 3;
+      }
+    }});
+  }
+  for(const tr of trees){
+    if(!tr.fruit || tr.fruitN<=0) continue;
+    const d = dist(player.x,player.y, tr.tx*T+8, tr.ty*T+8);
+    if(d < 26) cands.push({d, f:()=>{ tr.shakeT = 0.6; tr.pendingDrop = 0.3; }});
+  }
+  {
+    const d = dist(player.x,player.y, dog.x,dog.y);
+    if(d < 30) cands.push({d:d*1.05, f:()=>{
+      petCount++;
+      dog.happyT = 1.2; dog.sayT = 1.2; dog.jumpT = 0.45;
+      bark();
+      for(let i=0;i<3;i++){
+        hearts.push({x:dog.x+(Math.random()*14-7), y:dog.y-10-i*3,
+                     vy:-(14+Math.random()*10), life:1.2+i*0.15});
+      }
+    }});
+  }
+  {
+    const [dx,dy] = dirVec();
+    const wx = player.x+dx*20, wy = player.y+dy*20;
+    const tx = Math.floor(wx/T), ty = Math.floor(wy/T);
+    if(tx>=0&&ty>=0&&tx<MW&&ty<MH && ground[ty][tx]==="w"){
+      cands.push({d:27, f:()=>startFishing(wx, wy)});
+    }
+  }
+  if(cands.length){
+    cands.sort((a,b)=>a.d-b.d);
+    cands[0].f();
+  }
+}
+
+/* ================= 更新 ================= */
+let time = 0;
+function update(dt){
+  time += dt;
+  tickMusic();
+
+  if(actPressed){ tryAction(); actPressed = false; }
+
+  /* --- プレイヤー --- */
+  let vx=0, vy=0;
+  if(!dialog){
+    if(keys["ArrowLeft"]||keys["a"]) vx=-1;
+    if(keys["ArrowRight"]||keys["d"]) vx=1;
+    if(keys["ArrowUp"]||keys["w"]) vy=-1;
+    if(keys["ArrowDown"]||keys["s"]) vy=1;
+  }
+  if(fishing && (vx||vy)) fishing = null;
+  const sp = 78*dt;
+  if(vx&&vy){ vx*=0.707; vy*=0.707; }
+  player.moving = !!(vx||vy);
+  if(player.moving){
+    if(Math.abs(vx)>Math.abs(vy)) player.dir = vx>0?"right":"left";
+    else if(vy) player.dir = vy>0?"down":"up";
+    const nx = player.x+vx*sp, ny = player.y+vy*sp;
+    if(!blocked(nx,player.y)) player.x = nx;
+    if(!blocked(player.x,ny)) player.y = ny;
+    player.animT += dt;
+    if(player.animT>0.14){ player.animT=0; player.frame^=1; }
+    player.idleT = 0;
+  }else{
+    player.frame = 0; player.idleT += dt;
+  }
+
+  /* --- 会話タイプライター --- */
+  if(dialog && dialog.chars < dialog.text.length){
+    const before = Math.floor(dialog.chars);
+    dialog.chars = Math.min(dialog.text.length, dialog.chars + dt*20);
+    const after = Math.floor(dialog.chars);
+    if(after > before && after % 2 === 0){
+      const ch = dialog.text[after-1];
+      if(ch !== " " && ch !== "、" && ch !== "。") voiceBlip(dialog.v.pitch);
+    }
+  }
+
+  /* --- 釣り --- */
+  if(fishing){
+    fishing.t += dt;
+    if(fishing.state==="wait" && fishing.t >= fishing.biteT){
+      fishing.state = "bite"; fishing.hookT = 0.8;
+      sfx("sine", 700, 0.1, 0.12, 300);
+    }
+    if(fishing.state==="bite"){
+      fishing.hookT -= dt;
+      if(fishing.hookT <= 0) endFishing("にげられちゃった…");
+    }
+  }
+
+  /* --- 足あとトレイル --- */
+  const dtr = Math.hypot(player.x-lastTrail.x, player.y-lastTrail.y);
+  if(dtr > 3){
+    trail.push({x:lastTrail.x, y:lastTrail.y});
+    lastTrail = {x:player.x, y:player.y};
+    if(trail.length > 30) trail.shift();
+  }
+
+  /* --- わんちゃん --- */
+  dog.wagPhase += dt * (dog.happyT>0 ? 18 : 5);
+  if(dog.happyT>0) dog.happyT -= dt;
+  if(dog.sayT>0) dog.sayT -= dt;
+  if(dog.jumpT>0) dog.jumpT -= dt;
+  dog.moving = false;
+  if(trail.length > 6){
+    const tgt = trail[0];
+    const dx = tgt.x-dog.x, dy = tgt.y-dog.y;
+    const d = Math.hypot(dx,dy);
+    const dsp = (trail.length>16 ? 120 : 74)*dt;
+    if(d > 2){
+      dog.x += dx/d*dsp; dog.y += dy/d*dsp;
+      dog.moving = true;
+      if(Math.abs(dx) > 1.5) dog.face = dx>0?"r":"l";
+      dog.mode = Math.abs(dx) > Math.abs(dy)*1.15 ? "side" : (dy>0 ? "down" : "up");
+      dog.animT += dt;
+      if(dog.animT>0.12){ dog.animT=0; dog.frame^=1; }
+    }
+    if(d <= Math.max(2.5, dsp)) trail.shift();
+  }
+  if(!dog.moving) dog.frame = 0;
+
+  /* --- 住民の おさんぽAI --- */
+  for(const v of VILLAGERS){
+    const nearPlayer = dist(player.x,player.y, v.x,v.y) < 28;
+    if(dialog && dialog.v === v){ v.state = "idle"; continue; }
+    v.wt -= dt;
+    if(nearPlayer){ v.state = "idle"; v.wt = Math.max(v.wt, 0.6); }
+    else if(v.wt <= 0){
+      if(v.state === "idle" && Math.random() < 0.6){
+        v.tx = v.hx + (Math.random()*56-28);
+        v.ty = v.hy + (Math.random()*40-20);
+        v.state = "walk";
+        v.wt = 6;
+      }else{
+        v.state = "idle";
+        v.wt = 1.2 + Math.random()*2.5;
+      }
+    }
+    if(v.state === "walk"){
+      const dx = v.tx-v.x, dy = v.ty-v.y;
+      const d = Math.hypot(dx,dy);
+      if(d < 2){ v.state="idle"; v.wt = 1.5+Math.random()*2; }
+      else{
+        const step = 22*dt;
+        const nx = v.x+dx/d*step, ny = v.y+dy/d*step;
+        if(!blocked(nx,ny)){ v.x = nx; v.y = ny; v.walkT += dt; }
+        else{ v.state="idle"; v.wt = 1+Math.random()*2; }
+      }
+    }
+  }
+
+  /* --- いきもの --- */
+  for(const c of critters){
+    if(c.duck){
+      c.ang += dt*0.4;
+      c.x = 32.3*T + Math.cos(c.ang)*26;
+      c.y = 21.3*T + Math.sin(c.ang)*13;
+    }
+  }
+
+  /* --- 木：ゆれ・りんご --- */
+  for(const tr of trees){
+    if(tr.shakeT>0) tr.shakeT -= dt;
+    if(tr.pendingDrop>0){
+      tr.pendingDrop -= dt;
+      if(tr.pendingDrop<=0 && tr.fruitN>0){
+        const bx = tr.tx*T+8, by = tr.ty*T;
+        for(let i=0;i<tr.fruitN;i++){
+          groundItems.push({ x:bx+(i-1)*8+(Math.random()*4-2), y:by-10,
+            vy:-20-Math.random()*20, gy:by+16+Math.random()*7, type:"apple" });
+        }
+        tr.fruitN = 0; tr.regrowT = 45;
+        sfx("triangle", 500, 0.1, 0.08, 300);
+      }
+    }
+    if(tr.fruit && tr.fruitN===0){
+      tr.regrowT -= dt;
+      if(tr.regrowT<=0) tr.fruitN = 3;
+    }
+  }
+  /* --- おちてる りんご --- */
+  for(let i=groundItems.length-1;i>=0;i--){
+    const it = groundItems[i];
+    it.vy += 200*dt; it.y += it.vy*dt;
+    if(it.y > it.gy){ it.y = it.gy; it.vy = Math.abs(it.vy)>25 ? -it.vy*0.4 : 0; }
+    if(dist(player.x,player.y,it.x,it.y) < 15){
+      pocket.apple++;
+      floatTexts.push({x:it.x, y:it.y-6, text:"🍎 +1", t:1.2});
+      popSound();
+      groundItems.splice(i,1);
+    }
+  }
+
+  /* --- はなびら --- */
+  for(const tr of trees){
+    if(!tr.cherry) continue;
+    if(Math.random() < 0.9*dt){
+      petals.push({ x:tr.tx*T+8+(Math.random()*24-12), y:tr.ty*T-8+(Math.random()*10-5),
+        life:4, ph:Math.random()*6 });
+    }
+  }
+  for(let i=petals.length-1;i>=0;i--){
+    const p = petals[i];
+    p.life -= dt; p.y += 12*dt; p.x += Math.sin(time*2.4+p.ph)*10*dt;
+    if(p.life<=0) petals.splice(i,1);
+  }
+
+  /* --- ハート --- */
+  for(let i=hearts.length-1;i>=0;i--){
+    const hh = hearts[i];
+    hh.life -= dt; hh.y += hh.vy*dt; hh.vy *= 0.96;
+    if(hh.life<=0) hearts.splice(i,1);
+  }
+
+  /* --- ちょうちょ --- */
+  for(const b of butterflies){
+    if(b.caughtT > 0){
+      b.caughtT -= dt;
+      if(b.caughtT <= 0){ b.x = b.hx; b.y = b.hy; }
+      continue;
+    }
+    b.t -= dt;
+    if(b.t<=0){
+      b.t = 2+Math.random()*3;
+      b.tx = b.hx + (Math.random()*80-40);
+      b.ty = b.hy + (Math.random()*50-25);
+    }
+    b.x += (b.tx-b.x)*0.6*dt + Math.sin(time*3+b.ph)*8*dt;
+    b.y += (b.ty-b.y)*0.6*dt + Math.cos(time*4+b.ph)*6*dt;
+  }
+
+  /* --- えんとつのけむり --- */
+  if(Math.random() < 1.2*dt){
+    const h = houses[Math.floor(Math.random()*houses.length)];
+    puffs.push({x:h.tx*T+50, y:h.ty*T+2, life:2.5, r:2});
+  }
+  for(let i=puffs.length-1;i>=0;i--){
+    const p = puffs[i];
+    p.life -= dt; p.y -= 9*dt; p.x += Math.sin(time+p.y*0.2)*4*dt; p.r += 1.6*dt;
+    if(p.life<=0) puffs.splice(i,1);
+  }
+
+  /* --- くも --- */
+  for(const c of clouds){
+    c.x += c.v*dt;
+    if(c.x > MW*T+80) c.x = -80;
+  }
+
+  /* --- ポップアップ・フロートテキスト --- */
+  if(popup){ popup.t -= dt; if(popup.t<=0) popup = null; }
+  for(let i=floatTexts.length-1;i>=0;i--){
+    const f = floatTexts[i];
+    f.t -= dt; f.y -= 14*dt;
+    if(f.t<=0) floatTexts.splice(i,1);
+  }
+}
+
+/* ================= 描画 ================= */
+let cam = {x:0,y:0};
+
+function drawGround(){
+  const x0 = Math.floor(cam.x/T), y0 = Math.floor(cam.y/T);
+  for(let ty=y0; ty<=y0+VH/T; ty++){
+    for(let tx=x0; tx<=x0+VW/T; tx++){
+      if(tx<0||ty<0||tx>=MW||ty>=MH) continue;
+      const px = tx*T, py = ty*T;
+      const v = ground[ty][tx];
+      const h = h32(tx,ty);
+      ctx.fillStyle = ((tx+ty)&1) ? "#8ecf6f" : "#88c968";
+      ctx.fillRect(px,py,T,T);
+      if(v==="g" || v==="f"){
+        if(h%5===0){
+          ctx.fillStyle = "#75bb55";
+          const ox = 3+h%9, oy = 3+(h>>3)%9;
+          ctx.fillRect(px+ox,py+oy,1,3); ctx.fillRect(px+ox+2,py+oy+1,1,2);
+        }
+        if(h%23===0){ ctx.fillStyle="#fff"; ctx.fillRect(px+(h%12)+2, py+((h>>4)%12)+2, 2,2); }
+      }
+      if(v==="f"){
+        const cols = ["#ff6f91","#ffd166","#ffffff","#c58bf2"];
+        for(let i=0;i<3;i++){
+          const fx = px+2+((h>>(i*3))%10), fy = py+2+((h>>(i*3+2))%10);
+          ctx.fillStyle = "#4f9c3d"; ctx.fillRect(fx+1,fy+2,1,3);
+          ctx.fillStyle = cols[(h>>i)%4];
+          ctx.fillRect(fx,fy,3,1); ctx.fillRect(fx+1,fy-1,1,3);
+          ctx.fillStyle = "#ffe9a8"; ctx.fillRect(fx+1,fy,1,1);
+        }
+      }
+      if(v==="p"){
+        ctx.fillStyle = "#eed9a9"; ctx.fillRect(px,py,T,T);
+        ctx.fillStyle = "#dcc28a";
+        const isP = (x,y)=> x>=0&&y>=0&&x<MW&&y<MH&&(ground[y][x]==="p");
+        if(!isP(tx,ty-1)) ctx.fillRect(px,py,T,2);
+        if(!isP(tx,ty+1)) ctx.fillRect(px,py+T-2,T,2);
+        if(!isP(tx-1,ty)) ctx.fillRect(px,py,2,T);
+        if(!isP(tx+1,ty)) ctx.fillRect(px+T-2,py,2,T);
+        if(h%6===0){ ctx.fillStyle="#e0c58f"; ctx.fillRect(px+(h%11)+2,py+((h>>5)%11)+2,2,2); }
+      }
+      if(v==="w"){
+        ctx.fillStyle = "#6ec6e6"; ctx.fillRect(px,py,T,T);
+        const isW = (x,y)=> x>=0&&y>=0&&x<MW&&y<MH&&(ground[y][x]==="w");
+        ctx.fillStyle = "#bfe9f6";
+        if(!isW(tx,ty-1)) ctx.fillRect(px,py,T,2);
+        if(!isW(tx,ty+1)) ctx.fillRect(px,py+T-2,T,2);
+        if(!isW(tx-1,ty)) ctx.fillRect(px,py,2,T);
+        if(!isW(tx+1,ty)) ctx.fillRect(px+T-2,py,2,T);
+        ctx.fillStyle = "#8fd7f0";
+        const w1 = (h + Math.floor(time*2))%4;
+        ctx.fillRect(px+2+w1*2, py+5+(h%6), 4,1);
+        if((h + Math.floor(time*1.5))%17===0){
+          ctx.fillStyle="#eafaff"; ctx.fillRect(px+6,py+8,2,2);
+        }
+      }
+    }
+  }
+}
+
+function drawTree(tr){
+  const x = tr.tx*T, y = tr.ty*T;
+  let s = Math.round(Math.sin(time*0.9 + tr.tx*0.7));
+  if(tr.shakeT > 0.2) s = Math.round(Math.sin(time*32)*2);
+  ctx.fillStyle = "#4a3228"; ctx.fillRect(x+5,y+3,6,13);
+  ctx.fillStyle = "#8a5a3a"; ctx.fillRect(x+6,y+4,4,12);
+  const cx = x+8+s, cy = y-3;
+  if(tr.cherry){
+    circle(cx,cy+2,13,"#e087ac");
+    circle(cx,cy-1,11,"#ff9ec4");
+    circle(cx-4,cy-5,5,"#ffc9dd");
+    ctx.fillStyle="#fff";
+    ctx.fillRect(cx+3,cy-6,2,2); ctx.fillRect(cx-8,cy+1,2,2); ctx.fillRect(cx+6,cy+3,2,2);
+  }else{
+    circle(cx,cy+2,13,"#4f9c3d");
+    circle(cx,cy-1,11,"#67b34e");
+    circle(cx-4,cy-5,5,"#8bcf70");
+    if(tr.fruit && tr.fruitN>0){
+      const offs = [[-7,-2],[1,-7],[4,1]];
+      for(let i=0;i<tr.fruitN;i++){
+        const ax = cx+offs[i][0], ay = cy+offs[i][1];
+        ctx.fillStyle="#e0303a"; ctx.fillRect(ax,ay,3,3);
+        ctx.fillStyle="#ff7a80"; ctx.fillRect(ax,ay,1,1);
+      }
+    }
+  }
+}
+function circle(cx,cy,r,col){
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.fill();
+}
+
+function drawHouse(h){
+  const x = h.tx*T, y = h.ty*T;
+  ctx.fillStyle = "#4a3228"; ctx.fillRect(x+5,y+27,54,35);
+  ctx.fillStyle = "#fdf3e3"; ctx.fillRect(x+7,y+29,50,31);
+  for(const wx of [x+13, x+43]){
+    ctx.fillStyle="#4a3228"; ctx.fillRect(wx-1,y+34,11,11);
+    ctx.fillStyle="#aee3f5"; ctx.fillRect(wx,y+35,9,9);
+    ctx.fillStyle="#fff"; ctx.fillRect(wx+4,y+35,1,9); ctx.fillRect(wx,y+39,9,1);
+  }
+  ctx.fillStyle="#4a3228"; ctx.fillRect(x+26,y+41,13,19);
+  ctx.fillStyle="#a3703f"; ctx.fillRect(x+27,y+42,11,18);
+  ctx.fillStyle="#ffd166"; ctx.fillRect(x+35,y+50,2,2);
+  for(let r=0;r<26;r++){
+    const half = 6 + r*1.05;
+    ctx.fillStyle = r>22 ? h.roofD : h.roof;
+    ctx.fillRect(Math.round(x+32-half), y+2+r, Math.round(half*2), 1);
+  }
+  ctx.fillStyle = h.roofD;
+  ctx.fillRect(x+2,y+27,60,2);
+  ctx.fillStyle="#b8646a"; ctx.fillRect(x+46,y+2,8,12);
+  ctx.fillStyle="#95484f"; ctx.fillRect(x+46,y+2,8,3);
+}
+
+function drawBench(){
+  const x = bench.tx*T, y = bench.ty*T;
+  ctx.fillStyle="#4a3228"; ctx.fillRect(x+1,y+3,30,10);
+  ctx.fillStyle="#b07a4a"; ctx.fillRect(x+2,y+4,28,3);
+  ctx.fillStyle="#96633a"; ctx.fillRect(x+2,y+8,28,4);
+  ctx.fillStyle="#4a3228";
+  ctx.fillRect(x+4,y+12,3,4); ctx.fillRect(x+25,y+12,3,4);
+}
+function drawLamp(l){
+  const x = l[0]*T, y = l[1]*T;
+  ctx.fillStyle="#3f6d6a"; ctx.fillRect(x+7,y-4,3,18);
+  circle(x+8,y-6,4,"#3f6d6a");
+  circle(x+8,y-6,3,"#ffd97a");
+  ctx.fillStyle="rgba(255,220,130,0.25)";
+  ctx.beginPath(); ctx.arc(x+8,y-6,7,0,7); ctx.fill();
+}
+function drawBush(b){
+  const x=b[0]*T, y=b[1]*T;
+  circle(x+8,y+9,7,"#4f9c3d");
+  circle(x+7,y+7,6,"#67b34e");
+  ctx.fillStyle="#8bcf70"; ctx.fillRect(x+4,y+4,2,2);
+}
+
+function drawGirl(){
+  if(SPR.girl){
+    const set = player.dir==="left" ? SPR.girl.side
+              : player.dir==="right" ? SPR.girl.sideR
+              : player.dir==="up" ? SPR.girl.up : SPR.girl.down;
+    const fr = player.moving ? set[1+player.frame] : set[0];
+    ctx.drawImage(fr.c, Math.round(player.x-fr.w/2), Math.round(player.y-fr.h+3));
+    return;
+  }
+  const img = GIRL[player.dir][player.moving ? player.frame : 0];
+  ctx.drawImage(img, Math.round(player.x-6), Math.round(player.y-13));
+}
+function drawDog(){
+  const jump = dog.jumpT>0 ? Math.round(Math.sin(dog.jumpT/0.45*Math.PI)*5) : 0;
+  if(SPR.dog){
+    const set = dog.mode==="down" ? SPR.dog.down
+              : dog.mode==="up" ? SPR.dog.up
+              : (dog.face==="r" ? SPR.dog.sideR : SPR.dog.side);
+    const fr = dog.moving ? set[1+dog.frame] : set[0];
+    ctx.drawImage(fr.c, Math.round(dog.x-fr.w/2), Math.round(dog.y-fr.h+4) - jump);
+    return;
+  }
+  const face = dog.face==="r" ? "right" : "left";
+  const img = DOG[face][dog.moving ? dog.frame : 0];
+  const dx = Math.round(dog.x-8), dy = Math.round(dog.y-8) - jump;
+  ctx.drawImage(img, dx, dy);
+  const wag = Math.sin(dog.wagPhase) > 0;
+  const ax = dog.face==="r" ? dx+2 : dx+13;
+  const s  = dog.face==="r" ? 1 : -1;
+  ctx.fillStyle = PAL.O;
+  if(wag){
+    ctx.fillRect(ax-1*s-1, dy+4, 2,2); ctx.fillRect(ax-2*s-1, dy+2, 2,2);
+    ctx.fillStyle = PAL.C; ctx.fillRect(ax-2*s-1, dy+0, 2,2);
+  }else{
+    ctx.fillRect(ax-2*s-1, dy+5, 2,2); ctx.fillRect(ax-3*s-1, dy+4, 2,2);
+    ctx.fillStyle = PAL.C; ctx.fillRect(ax-4*s-1, dy+3, 2,2);
+  }
+}
+function drawLeash(){
+  const hx = player.x + (player.dir==="left"?-6:player.dir==="right"?6:0);
+  const hy = player.y - 5;
+  const nx = dog.x + (dog.face==="r"?6:-6), ny = dog.y - 8;
+  ctx.strokeStyle = "#c9575c"; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(Math.round(hx)+.5, Math.round(hy)+.5);
+  ctx.quadraticCurveTo((hx+nx)/2, Math.max(hy,ny)+5, Math.round(nx)+.5, Math.round(ny)+.5);
+  ctx.stroke();
+}
+function drawVillager(v){
+  const wf = Math.floor(v.walkT*7)%2;
+  if(SPR[v.key]){
+    const sh = SPR[v.key];
+    let set = sh.down, fr;
+    if(v.state==="walk"){
+      const dx = v.tx-v.x, dy = v.ty-v.y;
+      if(Math.abs(dx) > Math.abs(dy)*1.15) set = dx>0 ? sh.sideR : sh.side;
+      else set = dy>0 ? sh.down : sh.up;
+      fr = set[1+wf];
+    }else fr = set[0];
+    ctx.drawImage(fr.c, Math.round(v.x-fr.w/2), Math.round(v.y-fr.h+3));
+    return;
+  }
+  const img = v.img[v.state==="walk" ? wf : 0];
+  const bob = v.state==="walk" ? wf : 0;
+  ctx.drawImage(img, Math.round(v.x-6), Math.round(v.y-img.height+3) - bob);
+}
+
+function drawWorld(){
+  cam.x = Math.round(clamp(player.x - VW/2, 0, MW*T-VW));
+  cam.y = Math.round(clamp(player.y - VH/2, 0, MH*T-VH));
+  ctx.save();
+  ctx.translate(-cam.x, -cam.y);
+
+  drawGround();
+
+  /* 影 */
+  ctx.fillStyle = "rgba(60,90,50,0.25)";
+  ctx.beginPath(); ctx.ellipse(player.x, player.y+3, 8,3,0,0,7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(dog.x, dog.y+4, 9,3,0,0,7); ctx.fill();
+  for(const v of VILLAGERS){
+    ctx.beginPath(); ctx.ellipse(v.x, v.y+3, 8,3,0,0,7); ctx.fill();
+  }
+
+  drawLeash();
+
+  /* 釣り */
+  if(fishing){
+    const hx = player.x + dirVec()[0]*5, hy = player.y - 6;
+    const dip = fishing.state==="bite" ? 2 : Math.round(Math.sin(time*3)*1);
+    ctx.strokeStyle="rgba(80,60,50,0.8)"; ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(Math.round(hx)+.5, Math.round(hy)+.5);
+    ctx.lineTo(Math.round(fishing.bx)+.5, Math.round(fishing.by+dip)-2+.5);
+    ctx.stroke();
+    ctx.fillStyle="#e0303a"; ctx.fillRect(Math.round(fishing.bx)-2, Math.round(fishing.by+dip)-2, 4,3);
+    ctx.fillStyle="#fff"; ctx.fillRect(Math.round(fishing.bx)-2, Math.round(fishing.by+dip)+1, 4,1);
+    ctx.strokeStyle="rgba(255,255,255,0.5)";
+    ctx.beginPath();
+    ctx.ellipse(fishing.bx, fishing.by+2, 5+Math.sin(time*4)*1.5, 2.4,0,0,7);
+    ctx.stroke();
+  }
+
+  /* y ソートして描画 */
+  const items = [];
+  for(const tr of trees) items.push({y:(tr.ty+1)*T, f:()=>drawTree(tr)});
+  for(const h of houses) items.push({y:(h.ty+4)*T, f:()=>drawHouse(h)});
+  for(const b of bushes) items.push({y:(b[1]+1)*T, f:()=>drawBush(b)});
+  items.push({y:(bench.ty+1)*T, f:drawBench});
+  for(const l of lamps) items.push({y:(l[1]+1)*T, f:()=>drawLamp(l)});
+  for(const c of critters){
+    items.push({y:c.y+8, f:()=>{
+      const bob = Math.round(Math.sin(time*2.5+c.phase)*1);
+      if(c.duck){
+        ctx.strokeStyle="rgba(255,255,255,0.5)"; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.ellipse(c.x, c.y+7, 8+Math.sin(time*2)*1.5, 3,0,0,7); ctx.stroke();
+        ctx.drawImage(c.img, Math.round(c.x-6), Math.round(c.y-4+bob*0.5));
+      }else{
+        ctx.drawImage(c.img, Math.round(c.x-5), Math.round(c.y-c.img.height+4+bob));
+      }
+    }});
+  }
+  for(const v of VILLAGERS) items.push({y:v.y+3, f:()=>drawVillager(v)});
+  for(const it of groundItems){
+    items.push({y:it.y+2, f:()=>{
+      ctx.fillStyle="#e0303a"; ctx.fillRect(Math.round(it.x)-1, Math.round(it.y)-2, 3,3);
+      ctx.fillStyle="#ff7a80"; ctx.fillRect(Math.round(it.x)-1, Math.round(it.y)-2, 1,1);
+      ctx.fillStyle="#4f9c3d"; ctx.fillRect(Math.round(it.x), Math.round(it.y)-3, 1,1);
+    }});
+  }
+  items.push({y:player.y+3, f:drawGirl});
+  items.push({y:dog.y+4, f:drawDog});
+  items.sort((a,b)=>a.y-b.y);
+  for(const it of items) it.f();
+
+  /* けむり */
+  for(const p of puffs){
+    ctx.fillStyle = `rgba(240,240,245,${Math.min(0.6, p.life*0.35)})`;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,7); ctx.fill();
+  }
+  /* はなびら */
+  for(const p of petals){
+    ctx.fillStyle = (p.ph%2<1) ? "#ffc9dd" : "#ffb0cc";
+    ctx.fillRect(Math.round(p.x), Math.round(p.y), 2,2);
+  }
+  /* ハート */
+  for(const hh of hearts){
+    drawHeart(Math.round(hh.x), Math.round(hh.y), hh.life>0.4?1:hh.life/0.4);
+  }
+  /* ちょうちょ */
+  for(const b of butterflies){
+    if(b.caughtT > 0) continue;
+    const open = Math.floor(time*10+b.ph)%2===0;
+    ctx.fillStyle = b.col;
+    const bx = Math.round(b.x), by = Math.round(b.y);
+    if(open){ ctx.fillRect(bx-3,by-1,2,2); ctx.fillRect(bx+1,by-1,2,2); }
+    else{ ctx.fillRect(bx-2,by-2,2,2); ctx.fillRect(bx,by-2,2,2); }
+    ctx.fillStyle="#4a3228"; ctx.fillRect(bx-1,by-1,1,2);
+  }
+  /* くも */
+  for(const c of clouds){
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.beginPath();
+    ctx.ellipse(c.x, c.y, 26*c.s, 8*c.s, 0,0,7);
+    ctx.ellipse(c.x-14*c.s, c.y+3, 14*c.s, 6*c.s, 0,0,7);
+    ctx.ellipse(c.x+15*c.s, c.y+2, 15*c.s, 6*c.s, 0,0,7);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  const vg = ctx.createRadialGradient(VW/2,VH/2,90, VW/2,VH/2,210);
+  vg.addColorStop(0,"rgba(255,240,200,0)");
+  vg.addColorStop(1,"rgba(255,190,140,0.15)");
+  ctx.fillStyle = vg; ctx.fillRect(0,0,VW,VH);
+}
+function drawHeart(x,y,a){
+  ctx.globalAlpha = a;
+  ctx.fillStyle = "#ff5f8f";
+  ctx.fillRect(x-2,y-2,2,2); ctx.fillRect(x+1,y-2,2,2);
+  ctx.fillRect(x-2,y-1,5,2); ctx.fillRect(x-1,y+1,3,1); ctx.fillRect(x,y+2,1,1);
+  ctx.globalAlpha = 1;
+}
+
+/* ================= オーバーレイUI ================= */
+function drawUI(){
+  const wpx = ui.width, hpx = ui.height;
+  uictx.clearRect(0,0,wpx,hpx);
+  const sc = wpx / VW;
+  const W2S = (wx,wy)=>[(wx-cam.x)*sc, (wy-cam.y)*sc];
+
+  /* いきものの ふきだし */
+  for(const c of critters){
+    const d = dist(player.x,player.y, c.x,c.y);
+    if(d < 52){
+      const [sx,sy] = W2S(c.x, c.y - (c.duck?10:c.img.height) - 4);
+      bubble(sx, sy + Math.sin(time*3)*2*sc/3, c.msg, sc);
+    }
+  }
+  /* 住民に「はなす」プロンプト */
+  if(!dialog){
+    for(const v of VILLAGERS){
+      const d = dist(player.x,player.y, v.x,v.y);
+      if(d < 26){
+        const [sx,sy] = W2S(v.x, v.y - v.h - 4);
+        bubble(sx, sy, `${v.name}と はなす [スペース]`, sc, true);
+        break;
+      }
+    }
+  }
+  const dogH = SPR.dog ? SPR.dog.side[0].h + 4 : 16;
+  if(dog.sayT>0){
+    const [sx,sy] = W2S(dog.x, dog.y-dogH);
+    bubble(sx, sy, "わんっ♪", sc);
+  }else if(!dialog && !fishing){
+    const d = dist(player.x,player.y, dog.x,dog.y);
+    if(d < 30 && !player.moving && player.idleT > 1.2){
+      const [sx,sy] = W2S(dog.x, dog.y-dogH);
+      bubble(sx, sy, "スペースで なでてね", sc, true);
+    }
+  }
+  /* 釣りの「！」 */
+  if(fishing && fishing.state==="bite"){
+    const [sx,sy] = W2S(fishing.bx, fishing.by-10);
+    const fs = 8*sc;
+    uictx.font = `bold ${fs}px sans-serif`;
+    uictx.fillStyle = "#ff3b5c";
+    uictx.strokeStyle = "#fff"; uictx.lineWidth = 3*sc/3;
+    uictx.textAlign = "center";
+    uictx.strokeText("！", sx, sy);
+    uictx.fillText("！", sx, sy);
+    uictx.textAlign = "left";
+  }
+
+  /* ポケット */
+  const fs = Math.max(12, 5.2*sc);
+  uictx.font = `bold ${fs}px 'Hiragino Maru Gothic ProN', sans-serif`;
+  const label = `💗 ${petCount}   🍎 ${pocket.apple}   🐟 ${pocket.fish}   🦋 ${pocket.bug}`;
+  const tw = uictx.measureText(label).width;
+  roundRect(uictx, 4*sc, 4*sc, tw+7*sc, 9*sc, 4.5*sc, "rgba(255,255,255,0.85)");
+  uictx.fillStyle = "#c05577";
+  uictx.textBaseline = "middle";
+  uictx.fillText(label, 7.5*sc, 8.7*sc);
+
+  /* フロートテキスト */
+  for(const f of floatTexts){
+    const [sx,sy] = W2S(f.x, f.y);
+    const ffs = Math.max(11, 4.6*sc);
+    uictx.font = `bold ${ffs}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.globalAlpha = Math.min(1, f.t/0.4);
+    uictx.strokeStyle = "#fff"; uictx.lineWidth = 3;
+    uictx.textAlign = "center";
+    uictx.strokeText(f.text, sx, sy);
+    uictx.fillStyle = "#8a5f47";
+    uictx.fillText(f.text, sx, sy);
+    uictx.textAlign = "left";
+    uictx.globalAlpha = 1;
+  }
+
+  /* つりあげポップアップ */
+  if(popup){
+    const pfs = Math.max(14, 6.4*sc);
+    uictx.font = `bold ${pfs}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    const ptw = uictx.measureText(popup.text).width;
+    const scale = Math.min(1, (2.4-popup.t)*7);
+    const pw = (ptw+14*sc)*scale, ph = 14*sc*scale;
+    const px = wpx/2-pw/2, py = hpx*0.30-ph/2;
+    roundRect(uictx, px, py, pw, ph, 6*sc*scale, "rgba(255,248,239,0.95)");
+    uictx.strokeStyle = "#ffb0c8"; uictx.lineWidth = 2;
+    uictx.stroke();
+    if(scale > 0.9){
+      uictx.fillStyle = "#7a4a2f";
+      uictx.textAlign = "center"; uictx.textBaseline = "middle";
+      uictx.fillText(popup.text, wpx/2, py+ph/2);
+      uictx.textAlign = "left";
+    }
+  }
+
+  /* 会話ウィンドウ（どう森風） */
+  if(dialog){
+    const dw = wpx*0.84, dh = hpx*0.22;
+    const dx0 = (wpx-dw)/2, dy0 = hpx - dh - hpx*0.04;
+    roundRect(uictx, dx0, dy0, dw, dh, dh*0.28, "rgba(255,250,240,0.96)");
+    uictx.strokeStyle = "#e8c9a3"; uictx.lineWidth = 3;
+    uictx.stroke();
+    /* 名前タグ */
+    const nfs = dh*0.26;
+    uictx.font = `bold ${nfs}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    const ntw = uictx.measureText(dialog.v.name).width;
+    roundRect(uictx, dx0+dw*0.05, dy0-nfs*0.9, ntw+nfs*1.4, nfs*1.5, nfs*0.75, dialog.v.tag);
+    uictx.fillStyle = "#fff";
+    uictx.textBaseline = "middle";
+    uictx.fillText(dialog.v.name, dx0+dw*0.05+nfs*0.7, dy0-nfs*0.9+nfs*0.78);
+    /* 本文（タイプライター） */
+    const tfs = dh*0.30;
+    uictx.font = `${tfs}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.fillStyle = "#5f4432";
+    const shown = dialog.text.slice(0, Math.floor(dialog.chars));
+    const maxW = dw*0.86;
+    let line = "", ly = dy0 + dh*0.40;
+    for(const ch of shown){
+      if(uictx.measureText(line+ch).width > maxW){
+        uictx.fillText(line, dx0+dw*0.07, ly);
+        line = ch; ly += tfs*1.35;
+      }else line += ch;
+    }
+    uictx.fillText(line, dx0+dw*0.07, ly);
+    /* つづきマーク */
+    if(dialog.chars >= dialog.text.length && Math.floor(time*2.5)%2===0){
+      uictx.fillStyle = "#e0648d";
+      const mx = dx0+dw*0.94, my = dy0+dh*0.78;
+      uictx.beginPath();
+      uictx.moveTo(mx-tfs*0.3, my-tfs*0.25);
+      uictx.lineTo(mx+tfs*0.3, my-tfs*0.25);
+      uictx.lineTo(mx, my+tfs*0.2);
+      uictx.closePath(); uictx.fill();
+    }
+  }
+}
+function bubble(sx, sy, text, sc, soft){
+  const fs = Math.max(11, 4.6*sc);
+  uictx.font = `bold ${fs}px 'Hiragino Maru Gothic ProN', sans-serif`;
+  const tw = uictx.measureText(text).width;
+  const bw = tw + 5*sc, bh = 8*sc;
+  const bx = sx - bw/2, by = sy - bh;
+  roundRect(uictx, bx, by, bw, bh, 3.5*sc, soft?"rgba(255,255,255,0.72)":"rgba(255,255,255,0.94)");
+  uictx.beginPath();
+  uictx.moveTo(sx-1.6*sc, by+bh-1);
+  uictx.lineTo(sx, by+bh+2.4*sc);
+  uictx.lineTo(sx+1.6*sc, by+bh-1);
+  uictx.closePath();
+  uictx.fillStyle = soft?"rgba(255,255,255,0.72)":"rgba(255,255,255,0.94)";
+  uictx.fill();
+  uictx.fillStyle = soft ? "#9b8a80" : "#6b4a38";
+  uictx.textBaseline = "middle";
+  uictx.fillText(text, bx+2.5*sc, by+bh/2+1);
+}
+function roundRect(g,x,y,w,h,r,fill){
+  g.beginPath();
+  g.moveTo(x+r,y);
+  g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r);
+  g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r);
+  g.closePath(); g.fillStyle = fill; g.fill();
+}
+
+/* ================= メインループ ================= */
+let last = performance.now();
+function loop(now){
+  const dt = Math.min(0.05, (now-last)/1000);
+  last = now;
+  update(dt);
+  drawWorld();
+  drawUI();
+  requestAnimationFrame(loop);
+}
+fitUI();
+requestAnimationFrame(loop);
+
+/* デバッグ用フック */
+window.__G = { player, dog, VILLAGERS, trees, pocket, butterflies, groundItems, SPR,
+  act:()=>{ actPressed = true; },
+  tryAction,
+  step:(dt)=>update(dt),
+  get dialog(){ return dialog; },
+  get fishing(){ return fishing; } };
+</script>
+</body>
+</html>
