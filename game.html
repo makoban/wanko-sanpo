@@ -103,6 +103,14 @@
   }
   #ballBtn:active{ transform:scale(.92); }
   body.hasball #ballBtn{ display:flex; }
+  #feedBtn{
+    position:absolute; right:16px; bottom:152px; z-index:5;
+    width:52px; height:52px; border-radius:50%; border:none;
+    background:rgba(255,255,255,.88); font-size:24px;
+    box-shadow:0 4px 0 rgba(180,110,140,.5);
+    display:none; align-items:center; justify-content:center;
+  }
+  #feedBtn:active{ transform:scale(.92); }
   /* おみせ・ずかん パネル */
   .panel{
     position:absolute; inset:6% 5%; z-index:20;
@@ -191,6 +199,7 @@
     <div id="stickKnob"></div>
     <button id="act" title="アクション">🐾</button>
     <button id="ballBtn" title="ボールをなげる">🎾</button>
+    <button id="feedBtn" title="ごはんをあげる">🍖</button>
     <div id="shopPanel" class="panel"></div>
     <div id="bookPanel" class="panel"></div>
     <div id="namePanel" class="panel">
@@ -210,7 +219,7 @@
 </div>
 
 <p class="hint hint-pc">
-  🎮 <b>やじるしキー / WASD</b>：あるく　　🖐 <b>スペース</b>：はなす ・ なでる ・ きをゆらす ・ つる ・ とる ・ ほる　　🎾 <b>Z</b>：ボール　　📖 <b>B</b>：ずかん
+  🎮 <b>やじるしキー / WASD</b>：あるく　　🖐 <b>スペース</b>：はなす ・ なでる ・ つる ・ ほる ・ かたづける　　🍖 <b>F</b>：ごはん　　🎾 <b>Z</b>：ボール　　📖 <b>B</b>：ずかん
 </p>
 <p class="hint hint-sp">
   📱 <b>ゆびで ドラッグ</b>：あるく　　🐾 <b>タップ</b>：はなす ・ なでる ・ とる ・ ほる　　🎾ボタン：ボール
@@ -253,6 +262,7 @@ window.addEventListener("keydown", e=>{
   if((e.key===" "||e.key==="Spacebar") && !keys[" "]) actPressed = true;
   if(e.key==="b" || e.key==="B") toggleBook();
   if((e.key==="z" || e.key==="Z") && hasBall && ball.state==="none" && !dialog && !fishing && !race) throwBall();
+  if((e.key==="f" || e.key==="F") && !dialog && !fishing && !race) feedDog();
   if(e.key==="Escape"){ closePanels(); if(race) race = null; }
   keys[e.key] = true;
   if(e.key.length===1) keys[e.key.toLowerCase()] = true;
@@ -284,7 +294,7 @@ function placeStick(bx,by,kx,ky){
   stickKnob.style.left = kx+"px"; stickKnob.style.top = ky+"px";
 }
 stage.addEventListener("touchstart", e=>{
-  if(e.target.closest(".panel") || e.target===muteBtn || e.target===bookBtn || e.target===ballBtn2) return;
+  if(e.target.closest(".panel") || e.target===muteBtn || e.target===bookBtn || e.target===ballBtn2 || e.target.id==="feedBtn") return;
   /* レースちゅうは タップ＝おうえん れんだ */
   if(race){ actPressed = true; e.preventDefault(); return; }
   /* パネルが ひらいているとき、そとをタップしたら とじるだけ */
@@ -524,6 +534,26 @@ const RIVALS = {};
   im.onload = ()=>{ RIVALS[n] = sliceSheet(im, false); };
   im.src = "sprites/48/" + n + ".png";
 });
+/* --- おせわ用：こいぬ/シニアシート・ポーズ・きもちアイコン（v4） --- */
+["dog_puppy","dog_senior"].forEach(n=>{
+  const im = new Image();
+  im.onload = ()=>{ SPR[n] = sliceSheet(im, false); };
+  im.src = "sprites/48/" + n + ".png";
+});
+const POSE = {};
+["pose_fuse","pose_sleep","pose_sick"].forEach(n=>{
+  const im = new Image();
+  im.onload = ()=>{ POSE[n.replace("pose_","")] = im; };
+  im.src = "sprites/48/poses/" + n + ".png";
+});
+const ICONS = {};
+["heart","ase","zzz","sick","haraheri","niko","hane","hatena","onpu","star"].forEach(n=>{
+  const im = new Image();
+  im.onload = ()=>{ ICONS[n] = im; };
+  im.src = "sprites/items/icon/" + n + ".png";
+});
+const FOODBOWL = new Image(); FOODBOWL.src = "sprites/items/food/bowl-full.png";
+const POOPIMG = new Image(); POOPIMG.src = "sprites/items/care/poop.png";
 
 const SHEET_NAMES = ["girl","dog","moka","mike","kerota","penta","tonko","meeko","mimii","noron"];
 /* 48px版(v3かわいい)を優先、なければ32px版(v1)にフォールバック */
@@ -574,6 +604,11 @@ const icn = (cat,f)=>`<img class="icn" src="sprites/items/${cat}/${f}.png" alt="
 /* ================= もちもの・セーブ ================= */
 let bells = 0, hasBall = false, bandana = null, petCount = 0;
 let playerName = "", dogName = "", raceWins = 0;
+/* --- おせわ --- */
+let foodStock = 0, medCount = 0;
+const care = { hunger: 85, stage: "adult", growth: 0, sick: false, sickT: 0, hungryT: 0, poopT: 0, lastPetG: -99 };
+const poops = [];
+let poopTimer = 0, feedAnimT = 0, dogIdleT = 0, farewell = null;
 const pName = ()=> playerName || "あなた";
 const dName = ()=> dogName || "わんちゃん";
 const pocket = { apple:0, fossil:0 };
@@ -588,6 +623,7 @@ function doSave(){
     for(const v of VILLAGERS) love[v.key] = v.love;
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       bells, hasBall, bandana, petCount, playerName, dogName, raceWins,
+      foodStock, medCount, care, poops, savedAt: Date.now(),
       apple:pocket.apple, fossil:pocket.fossil,
       fishInv, bugInv,
       caughtFish:[...caughtFish], caughtBug:[...caughtBug],
@@ -604,6 +640,16 @@ function loadSave(){
     petCount = d.petCount||0;
     playerName = d.playerName||""; dogName = d.dogName||"";
     raceWins = d.raceWins||0;
+    foodStock = d.foodStock||0; medCount = d.medCount||0;
+    if(d.care) Object.assign(care, d.care);
+    if(!playerName) care.stage = "puppy";               /* はじめてなら こいぬから */
+    if(Array.isArray(d.poops)) poops.push(...d.poops.slice(0,4));
+    /* るすの あいだの おなかの へり（さいだい6時間ぶん・るす中に おわかれは しない） */
+    if(d.savedAt){
+      const off = Math.min((Date.now()-d.savedAt)/1000, 6*3600);
+      care.hunger = Math.max(0, care.hunger - off/45);
+      if(care.hunger<=0 && off>3600 && !care.sick){ care.sick = true; care.sickT = 0; }
+    }
     pocket.apple = d.apple||0; pocket.fossil = d.fossil||0;
     Object.assign(fishInv, d.fishInv||{});
     Object.assign(bugInv, d.bugInv||{});
@@ -1121,13 +1167,35 @@ function tryAction(){
     const d = dist(player.x,player.y, s.tx*T+12, s.ty*T+12);
     if(d < 36) cands.push({d, f:()=>digAt(s)});
   }
-  /* わんちゃん なでる */
+  /* うんちの おかたづけ */
+  for(const pp of poops){
+    const d = dist(player.x,player.y, pp.x, pp.y);
+    if(d < 33) cands.push({d:d*0.85, f:()=>{
+      poops.splice(poops.indexOf(pp), 1);
+      popSound();
+      floatTexts.push({x:pp.x, y:pp.y-12, text:"きれいに した！✨", t:1.4});
+      care.growth += 2; checkGrowth(); markSave();
+    }});
+  }
+  /* わんちゃん：かんびょう or なでる */
   {
     const d = dist(player.x,player.y, dog.x,dog.y);
     if(d < 45) cands.push({d:d*1.05, f:()=>{
+      if(care.sick && medCount > 0){
+        medCount--;
+        care.sick = false; care.sickT = 0; care.hungryT = 0; care.poopT = 0;
+        care.hunger = Math.max(care.hunger, 55);
+        jingle();
+        floatTexts.push({x:dog.x, y:dog.y-28, text:`${dName()}は げんきに なった！`, t:2.2});
+        dog.happyT = 2; dog.jumpT = 0.45;
+        for(let i=0;i<3;i++) hearts.push({x:dog.x+(Math.random()*20-10), y:dog.y-15-i*4, vy:-(21+Math.random()*15), life:1.3});
+        markSave();
+        return;
+      }
       petCount++;
       dog.happyT = 1.2; dog.sayT = 1.2; dog.jumpT = 0.45;
       bark();
+      if(time - care.lastPetG > 30){ care.growth += 1; care.lastPetG = time; checkGrowth(); }
       for(let i=0;i<3;i++){
         hearts.push({x:dog.x+(Math.random()*20-10), y:dog.y-15-i*4,
                      vy:-(21+Math.random()*15), life:1.2+i*0.15});
@@ -1284,6 +1352,7 @@ function updateRace(dt){
       R.prize = R.rank < 3 ? RACE_CLASSES[R.cls].prizes[R.rank] : 0;
       bells += R.prize;
       if(R.rank === 0) raceWins++;
+      care.growth += 5; checkGrowth();
       markSave();
       R.state = "done"; R.doneT = R.t;
       const rk = R.rank, pz = R.prize;
@@ -1323,7 +1392,11 @@ function openShop(){
     <div class="row"><span class="nm">${icn("fashion","bandana-sora")}バンダナ（そら）</span>
       <button data-buy="b_blue" ${bells>=300?"":"disabled"}>300ベル</button></div>
     <div class="row"><span class="nm">${icn("toy","tennis-ball")}ボール<br><small class="muted">なにもない ところで スペース／タップで なげる</small></span>
-      <button data-buy="ball" ${hasBall?"disabled":(bells>=500?"":"disabled")}>${hasBall?"かった！":"500ベル"}</button></div>`;
+      <button data-buy="ball" ${hasBall?"disabled":(bells>=500?"":"disabled")}>${hasBall?"かった！":"500ベル"}</button></div>
+    <div class="row"><span class="nm">${icn("food","dogfood")}ドッグフード（10しょく）<br><small class="muted">🍖ボタン／Fキーで ごはんを あげよう</small></span>
+      <button data-buy="food" ${bells>=300?"":"disabled"}>300ベル</button></div>
+    <div class="row"><span class="nm">${icn("care","kusuri")}おくすり<br><small class="muted">びょうきのとき ${dName()}を タップ</small></span>
+      <button data-buy="med" ${bells>=200?"":"disabled"}>200ベル</button></div>`;
   shopPanel.style.display = "block";
 }
 shopPanel.addEventListener("click", e=>{
@@ -1347,6 +1420,8 @@ shopPanel.addEventListener("click", e=>{
     if(k==="b_red" && bells>=300){ bells-=300; bandana="#e0575f"; popSound(); }
     if(k==="b_blue" && bells>=300){ bells-=300; bandana="#5b8dd6"; popSound(); }
     if(k==="ball" && !hasBall && bells>=500){ bells-=500; hasBall=true; jingle(); document.body.classList.add("hasball"); }
+    if(k==="food" && bells>=300){ bells-=300; foodStock+=10; popSound(); updateFeedBtn(); }
+    if(k==="med" && bells>=200){ bells-=200; medCount++; popSound(); }
     markSave(); openShop();
   }
 });
@@ -1376,6 +1451,7 @@ function toggleBook(){
     <div class="row"><span class="nm">🔔 ベル</span><span class="bells">${bells}</span></div>
     <div class="row"><span class="nm">💗 なでなで</span><span>${petCount}</span></div>
     <div class="row"><span class="nm">🏁 レースゆうしょう</span><span>${raceWins}かい</span></div>
+    <div class="row"><span class="nm">🐕 ${dName()}</span><span>${({puppy:"こいぬ",adult:"おとな",senior:"シニア"})[care.stage]} ・ そだちど ${care.growth}</span></div>
     <div class="row"><span class="nm">🦴 かせき</span><span>${pocket.fossil}</span></div>`;
   bookPanel.style.display = "block";
 }
@@ -1384,6 +1460,94 @@ bookPanel.addEventListener("click", e=>{
   if(e.target.dataset.close) closePanels();
   if(e.target.dataset.rename){ closePanels(); openNamePanel(); }
 });
+
+/* ================= おせわ（たまごっち） ================= */
+const feedBtn = document.getElementById("feedBtn");
+function updateFeedBtn(){ feedBtn.style.display = foodStock>0 ? "flex" : "none"; }
+feedBtn.addEventListener("click", ()=>feedDog());
+function dogSheet(){
+  if(care.stage==="puppy" && SPR.dog_puppy) return SPR.dog_puppy;
+  if(care.stage==="senior" && SPR.dog_senior) return SPR.dog_senior;
+  return SPR.dog || null;
+}
+function updateCare(dt){
+  if(feedAnimT > 0) feedAnimT -= dt;
+  /* おなかは じかんで へる（まんぷく→ぺこぺこ 約20分） */
+  care.hunger = Math.max(0, care.hunger - dt/12);
+  if(care.hunger <= 0){
+    care.hungryT += dt;
+    if(!care.sick && care.hungryT > 180) setSick();
+  }else care.hungryT = Math.max(0, care.hungryT - dt*0.5);
+  /* うんちの じかん */
+  if(poopTimer > 0){
+    poopTimer -= dt;
+    if(poopTimer <= 0 && poops.length < 4){
+      const px = dog.x + (Math.random()*44-22), py = dog.y + (Math.random()*30-15);
+      const tx = Math.floor(px/T), ty = Math.floor(py/T);
+      if(tx>1 && ty>1 && tx<MW-1 && ty<MH-1 && !solid[ty][tx] && ground[ty][tx]!=="w"){
+        poops.push({x:px, y:py}); markSave();
+      }
+    }
+  }
+  /* うんち放置は ふえいせい */
+  if(poops.length >= 3){
+    care.poopT += dt;
+    if(!care.sick && care.poopT > 240) setSick();
+  }else care.poopT = 0;
+  /* びょうきの しんこう */
+  if(care.sick){
+    care.sickT += dt;
+    if(care.sickT > 600 && !farewell) startFarewell();
+  }
+}
+function setSick(){
+  care.sick = true; care.sickT = 0;
+  sfx("sine", 300, 0.4, 0.1, 150);
+  floatTexts.push({x:dog.x, y:dog.y-28, text:`${dName()}の ぐあいが わるそう…`, t:2.6});
+  markSave();
+}
+function feedDog(){
+  if(foodStock<=0 || dialog || race || farewell) return;
+  if(care.hunger>=98){ floatTexts.push({x:dog.x, y:dog.y-24, text:"おなか いっぱい みたい", t:1.4}); return; }
+  foodStock--;
+  care.hunger = Math.min(100, care.hunger + 40);
+  care.growth += 5; checkGrowth();
+  feedAnimT = 1.6;
+  dog.happyT = 1.6; dog.jumpT = 0.45;
+  for(let i=0;i<2;i++) hearts.push({x:dog.x+(Math.random()*20-10), y:dog.y-16-i*4, vy:-(21+Math.random()*10), life:1.2});
+  [0,180,360].forEach(t=>setTimeout(()=>noiseSfx(0.06, 0.05, 1500, 500), t));
+  poopTimer = 50 + Math.random()*70;
+  updateFeedBtn(); markSave();
+}
+function checkGrowth(){
+  if(care.stage==="puppy" && care.growth>=120){
+    care.stage = "adult";
+    popup = { text:`🎉 ${dName()}は りっぱな おとなに なった！`, t:3.2 };
+    fanfare();
+  }else if(care.stage==="adult" && care.growth>=600){
+    care.stage = "senior";
+    popup = { text:`✨ ${dName()}は かんろくの シニアに なった`, t:3.2 };
+    jingle();
+  }
+  markSave();
+}
+function startFarewell(){
+  farewell = { t: 0 };
+  dialog = null; fishing = null; race = null; ball.state = "none";
+  closePanels();
+  sfx("triangle", 520, 0.7, 0.08, 240);
+}
+function newPuppy(){
+  farewell = null;
+  Object.assign(care, {hunger:85, stage:"puppy", growth:0, sick:false, sickT:0, hungryT:0, poopT:0});
+  poops.length = 0; poopTimer = 0; dogIdleT = 0;
+  dogName = "";
+  dog.x = player.x - 24; dog.y = player.y + 6;
+  markSave(); doSave();
+  popup = { text:"🐶 あたらしい こいぬが やってきた！", t:3 };
+  jingle();
+  setTimeout(openNamePanel, 800);
+}
 
 /* ================= 更新 ================= */
 let time = 0, dayOffset = 0;
@@ -1403,9 +1567,16 @@ function update(dt){
   tickMusic();
   const phase = dayPhase();
 
+  if(farewell){
+    farewell.t += dt;
+    actPressed = false;
+    if(farewell.t > 7.5) newPuppy();
+    return;
+  }
   if(race){ updateRace(dt); return; }
 
   if(actPressed){ tryAction(); actPressed = false; }
+  updateCare(dt);
 
   /* --- プレイヤー --- */
   let vx=0, vy=0;
@@ -1523,6 +1694,7 @@ function update(dt){
       ball.state = "none";
       dog.happyT = 1.5; dog.sayT = 1.2; dog.jumpT = 0.45;
       floatTexts.push({x:dog.x, y:dog.y-18, text:`${dName()}、えらい！`, t:1.6});
+      care.growth += 3; checkGrowth();
       for(let i=0;i<3;i++) hearts.push({x:dog.x+(Math.random()*20-10), y:dog.y-15-i*4, vy:-(21+Math.random()*15), life:1.2});
       bark();
       trail.length = 0; lastTrail = {x:player.x, y:player.y};
@@ -1543,7 +1715,7 @@ function update(dt){
     }
     if(d <= Math.max(2.5, dsp)) trail.shift();
   }
-  if(!dog.moving) dog.frame = 0;
+  if(!dog.moving){ dog.frame = 0; dogIdleT += dt; } else dogIdleT = 0;
 
   /* --- 住民AI --- */
   for(const v of VILLAGERS){
@@ -2113,12 +2285,45 @@ function drawGirl(){
   const img = GIRL[player.dir][player.moving ? player.frame : 0];
   ctx.drawImage(img, Math.round(player.x-6), Math.round(player.y-13));
 }
+function drawDogIcon(){
+  const sheet = dogSheet();
+  const h = sheet ? sheet.side[0].h : 24;
+  if(feedAnimT > 0 && FOODBOWL.complete && FOODBOWL.naturalWidth){
+    ctx.drawImage(FOODBOWL, Math.round(dog.x+10), Math.round(dog.y-10), 20, 20);
+  }
+  let ic = null;
+  if(care.sick) ic = ICONS.sick;
+  else if(care.hunger < 25) ic = ICONS.haraheri;
+  else if(dogIdleT > 30 && !dog.moving) ic = ICONS.zzz;
+  if(ic && ic.complete){
+    const bob = Math.round(Math.sin(time*3)*2);
+    ctx.drawImage(ic, Math.round(dog.x-9), Math.round(dog.y - h - 24 + bob), 18, 18);
+  }
+}
 function drawDog(){
   const jump = dog.jumpT>0 ? Math.round(Math.sin(dog.jumpT/0.45*Math.PI)*8) : 0;
-  if(SPR.dog){
-    const set = dog.mode==="down" ? SPR.dog.down
-              : dog.mode==="up" ? SPR.dog.up
-              : (dog.face==="r" ? SPR.dog.sideR : SPR.dog.side);
+  /* ポーズ（びょうき・すやすや・ふせ） */
+  if(!dog.moving && ball.state==="none" && dog.jumpT<=0){
+    let pimg = null;
+    if(care.sick && POSE.sick && POSE.sick.complete) pimg = POSE.sick;
+    else if(dogIdleT > 30 && POSE.sleep && POSE.sleep.complete) pimg = POSE.sleep;
+    else if(dogIdleT > 12 && POSE.fuse && POSE.fuse.complete) pimg = POSE.fuse;
+    if(pimg){
+      ctx.save();
+      if(dog.face === "r"){
+        ctx.translate(Math.round(dog.x)*2, 0); ctx.scale(-1, 1);
+      }
+      ctx.drawImage(pimg, Math.round(dog.x - pimg.width/2), Math.round(dog.y - pimg.height + 6));
+      ctx.restore();
+      drawDogIcon();
+      return;
+    }
+  }
+  const sheet = dogSheet();
+  if(sheet){
+    const set = dog.mode==="down" ? sheet.down
+              : dog.mode==="up" ? sheet.up
+              : (dog.face==="r" ? sheet.sideR : sheet.side);
     const fr = dog.moving ? set[1+dog.frame] : set[0];
     const dx = Math.round(dog.x-fr.w/2), dy = Math.round(dog.y-fr.h+6) - jump;
     ctx.drawImage(fr.c, dx, dy);
@@ -2126,6 +2331,7 @@ function drawDog(){
       ctx.fillStyle = bandana;
       ctx.fillRect(Math.round(dog.x-6), Math.round(dog.y - fr.h*0.45) - jump, 12, 4);
     }
+    drawDogIcon();
     return;
   }
   const face = dog.face==="r" ? "right" : "left";
@@ -2274,6 +2480,15 @@ function drawWorld(){
     }});
   }
   for(const v of VILLAGERS) items.push({y:v.y+3, f:()=>drawVillager(v)});
+  for(const pp of poops){
+    items.push({y:pp.y+2, f:()=>{
+      if(POOPIMG.complete && POOPIMG.naturalWidth){
+        ctx.drawImage(POOPIMG, Math.round(pp.x-10), Math.round(pp.y-16), 20, 20);
+      }else{
+        ctx.fillStyle="#8a5a3a"; ctx.fillRect(Math.round(pp.x-5), Math.round(pp.y-8), 10, 8);
+      }
+    }});
+  }
   for(const it of groundItems){
     items.push({y:it.y+3, f:()=>{
       ctx.fillStyle="#e0303a"; ctx.fillRect(Math.round(it.x)-2, Math.round(it.y)-3, 5,5);
@@ -2347,6 +2562,7 @@ function drawHeart(x,y,a){
 function drawUI(){
   const wpx = ui.width, hpx = ui.height;
   uictx.clearRect(0,0,wpx,hpx);
+  if(farewell){ drawFarewell(wpx, hpx); return; }
   if(race){ drawRaceUI(); return; }
   const psc = wpx / VW;           /* 位置変換用 */
   const sc = psc * 1.5;           /* 文字・ふきだしサイズ用（320px時代の基準を維持） */
@@ -2390,15 +2606,19 @@ function drawUI(){
       bubble(sx, sy, "🫛 そらまめ商店", sc, true);
     }
   }
-  const dogH = SPR.dog ? SPR.dog.side[0].h + 6 : 24;
+  const dsh = dogSheet();
+  const dogH = dsh ? dsh.side[0].h + 6 : 24;
   if(dog.sayT>0){
     const [sx,sy] = W2S(dog.x, dog.y-dogH);
     bubble(sx, sy, "わんっ♪", sc);
   }else if(!dialog && !fishing){
     const d = dist(player.x,player.y, dog.x,dog.y);
-    if(d < 45 && !player.moving && player.idleT > 1.2 && ball.state==="none"){
+    if(care.sick && d < 60){
       const [sx,sy] = W2S(dog.x, dog.y-dogH);
-      bubble(sx, sy, `${dName()}を なでてね`, sc, true);
+      bubble(sx, sy, medCount>0 ? "タップで おくすりを あげよう" : "おくすりが ひつよう…（商店で 200ベル）", sc);
+    }else if(d < 45 && !player.moving && player.idleT > 1.2 && ball.state==="none"){
+      const [sx,sy] = W2S(dog.x, dog.y-dogH);
+      bubble(sx, sy, care.hunger<25 ? `${dName()}は おなかぺこぺこ…🍖` : `${dName()}を なでてね`, sc, true);
     }
   }
   if(fishing && fishing.state==="bite"){
@@ -2422,6 +2642,16 @@ function drawUI(){
   uictx.fillStyle = "#c05577";
   uictx.textBaseline = "middle";
   uictx.fillText(label, 7*sc, 8.4*sc);
+  /* おせわチップ */
+  const stageTxt = ({puppy:"🐶こいぬ", adult:"🐕おとな", senior:"🎓シニア"})[care.stage] || "";
+  const hungerIcon = care.hunger<25 ? "🍖⚠" : "🍖";
+  const label2 = `${hungerIcon}${Math.round(care.hunger)}%  🥫${foodStock}  💊${medCount}  ${stageTxt}`;
+  const fs2 = Math.max(10, 4*sc);
+  uictx.font = `bold ${fs2}px 'Hiragino Maru Gothic ProN', sans-serif`;
+  const tw2 = uictx.measureText(label2).width;
+  roundRect(uictx, 4*sc, 13.6*sc, tw2+6*sc, 7.4*sc, 3.7*sc, "rgba(255,255,255,0.8)");
+  uictx.fillStyle = care.sick ? "#c0392b" : "#8a5f47";
+  uictx.fillText(label2, 7*sc, 17.4*sc);
 
   for(const f of floatTexts){
     const [sx,sy] = W2S(f.x, f.y);
@@ -2493,6 +2723,25 @@ function drawUI(){
     }
   }
 }
+function drawFarewell(wpx, hpx){
+  const sc = (wpx / VW) * 1.5;
+  uictx.fillStyle = "rgba(28,24,52,0.84)";
+  uictx.fillRect(0, 0, wpx, hpx);
+  const ic = ICONS.hane;
+  if(ic && ic.complete){
+    const s = 22*sc;
+    uictx.drawImage(ic, wpx/2 - s/2, hpx*0.28 - s/2 + Math.sin(time*1.5)*8, s, s);
+  }
+  uictx.textAlign = "center"; uictx.textBaseline = "middle";
+  uictx.font = `bold ${5.8*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+  uictx.fillStyle = "#fff";
+  uictx.fillText(`${dName()}は お空の おさんぽに でかけました…`, wpx/2, hpx*0.45, wpx*0.9);
+  uictx.font = `${4.4*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+  uictx.fillStyle = "#e6dcf5";
+  uictx.fillText("たくさんの おもいでを ありがとう", wpx/2, hpx*0.52);
+  uictx.fillText("いつか きっと また あえるよ", wpx/2, hpx*0.57);
+  uictx.textAlign = "left";
+}
 function bubble(sx, sy, text, sc, soft){
   const fs = Math.max(11, 4.6*sc);
   uictx.font = `bold ${fs}px 'Hiragino Maru Gothic ProN', sans-serif`;
@@ -2522,7 +2771,11 @@ function roundRect(g,x,y,w,h,r,fill){
 /* ================= メインループ ================= */
 loadSave();
 document.body.classList.toggle("hasball", hasBall);
-if(!playerName) setTimeout(openNamePanel, 600);   /* はじめてのときは なまえから */
+updateFeedBtn();
+if(!playerName){
+  care.stage = "puppy";                            /* はじめてなら こいぬから育てる */
+  setTimeout(openNamePanel, 600);
+}
 let last = performance.now();
 function loop(now){
   const dt = Math.min(0.05, (now-last)/1000);
@@ -2550,6 +2803,13 @@ window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundIte
   setBall:(v)=>{ hasBall = v; },
   setDayT:(t)=>{ dayOffset = t - (time % DAY_LEN); },
   openShop, toggleBook, openNamePanel, openRaceGate, startRace,
+  care, poops, feedDog, checkGrowth,
+  forceSick:()=>setSick(),
+  forceFarewell:()=>startFarewell(),
+  addFood:(n)=>{ foodStock+=n; updateFeedBtn(); },
+  addMed:(n)=>{ medCount+=n; },
+  get farewellState(){ return farewell; },
+  get careInfo(){ return {foodStock, medCount, hunger:care.hunger, stage:care.stage, growth:care.growth, sick:care.sick, poops:poops.length}; },
   get race(){ return race; },
   get raceWins(){ return raceWins; },
   get names(){ return {playerName, dogName}; } };
