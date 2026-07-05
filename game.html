@@ -653,6 +653,28 @@ const icn = (cat,f)=>`<img class="icn" src="sprites/items/${cat}/${f}.png" alt="
 /* ================= もちもの・セーブ ================= */
 let bells = 0, hasBall = false, bandana = null, petCount = 0;
 let playerName = "", dogName = "", raceWins = 0;
+/* --- おせわ指数（オンラインランキング） --- */
+const RANK_API = "https://wanko-rank.ai-fudosan.workers.dev";
+let careScore = 0, playerId = "", lastPlayDay = "";
+let rankInfo = null, netDirty = true, netTimer = 5;
+function addCare(n){
+  careScore = Math.max(0, Math.min(999999, careScore + n));
+  netDirty = true;
+  markSave();
+}
+function submitScore(){
+  if(!playerId || !playerName) return;
+  fetch(RANK_API + "/submit", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({id: playerId, name: playerName, dog: dName(), score: careScore})
+  }).then(()=>fetchRank()).catch(()=>{});
+}
+function fetchRank(){
+  if(!playerId || !playerName) return;
+  fetch(RANK_API + "/rank?id=" + encodeURIComponent(playerId))
+    .then(r=>r.json()).then(d=>{ rankInfo = d; }).catch(()=>{});
+}
 /* --- おせわ --- */
 let foodStock = 0, medCount = 0;
 const care = { hunger: 85, stage: "adult", growth: 0, sick: false, sickT: 0, hungryT: 0, poopT: 0, lastPetG: -99 };
@@ -669,6 +691,8 @@ function fmtAbsence(h){
 function applyAbsence(offH){
   lastAbsenceH = offH;
   if(offH < 0.1) return;
+  careScore = Math.max(0, careScore - Math.floor(offH));   /* ほったらかしは 指数もさがる */
+  netDirty = true;
   care.hunger = Math.max(0, care.hunger - offH*(100/24));
   const poopN = Math.min(3, Math.floor(offH/20));
   for(let i=0; i<poopN && poops.length<4; i++){
@@ -696,6 +720,7 @@ function doSave(){
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       bells, hasBall, bandana, petCount, playerName, dogName, raceWins,
       foodStock, medCount, care, poops, savedAt: Date.now(),
+      careScore, playerId, lastPlayDay,
       apple:pocket.apple, fossil:pocket.fossil,
       fishInv, bugInv,
       caughtFish:[...caughtFish], caughtBug:[...caughtBug],
@@ -712,6 +737,7 @@ function loadSave(){
     petCount = d.petCount||0;
     playerName = d.playerName||""; dogName = d.dogName||"";
     raceWins = d.raceWins||0;
+    careScore = d.careScore||0; playerId = d.playerId||""; lastPlayDay = d.lastPlayDay||"";
     foodStock = d.foodStock||0; medCount = d.medCount||0;
     if(d.care) Object.assign(care, d.care);
     if(!playerName) care.stage = "puppy";               /* はじめてなら こいぬから */
@@ -1138,6 +1164,7 @@ function startDialog(v){
     text = `わあ！ ${pName()}、ありがとう！！ おれいに ${v.quest.reward}ベル どうぞ♪`;
     v.quest = null;
     fanfare();
+    addCare(10);
     for(let i=0;i<3;i++) hearts.push({x:v.x+(Math.random()*20-10), y:v.y-24-i*4, vy:-(21+Math.random()*12), life:1.3});
     markSave();
   }else if(care.sick){
@@ -1198,7 +1225,7 @@ function digAt(spot){
   popup = { text: msg, t:2.4 };
   digSpots.splice(digSpots.indexOf(spot),1);
   digRespawnT = 8+Math.random()*10;
-  markSave();
+  addCare(1); markSave();
 }
 function tryAction(){
   if(dialog){
@@ -1217,7 +1244,7 @@ function tryAction(){
                                           : `🐟 ${f.name}を つりあげた！`) + (isNew?"　✨ずかんに のった！":""), t:2.6 };
       jingle();
       fishing = null;
-      markSave();
+      addCare(1); markSave();
     }
     return;
   }
@@ -1248,7 +1275,7 @@ function tryAction(){
         popup = { text:`🦋 ${b.name}を つかまえた！`+(isNew?"　✨ずかんに のった！":""), t:2.4 };
         jingle();
         bugs.splice(bugs.indexOf(b),1);
-        markSave();
+        addCare(1); markSave();
       }else{
         floatTexts.push({x:b.x, y:b.y-8, text:"にげられた！", t:1.4});
         b.tx = b.hx + (Math.random()*240-120); b.ty = b.hy + (Math.random()*150-75); b.t = 3;
@@ -1273,7 +1300,7 @@ function tryAction(){
       poops.splice(poops.indexOf(pp), 1);
       popSound();
       floatTexts.push({x:pp.x, y:pp.y-12, text:"きれいに した！✨", t:1.4});
-      care.growth += 2; checkGrowth(); markSave();
+      care.growth += 2; checkGrowth(); addCare(3); markSave();
     }});
   }
   /* つり */
@@ -1307,6 +1334,7 @@ function dogAction(){
     care.hunger = Math.max(care.hunger, 55);
     jingle();
     floatTexts.push({x:dog.x, y:dog.y-28, text:`${dName()}は げんきに なった！`, t:2.2});
+    addCare(5);
     dog.happyT = 2; dog.jumpT = 0.45;
     for(let i=0;i<3;i++) hearts.push({x:dog.x+(Math.random()*20-10), y:dog.y-15-i*4, vy:-(21+Math.random()*15), life:1.3});
     markSave();
@@ -1315,7 +1343,7 @@ function dogAction(){
   petCount++;
   dog.happyT = 1.2; dog.sayT = 1.2; dog.jumpT = 0.45;
   bark();
-  if(time - care.lastPetG > 30){ care.growth += 1; care.lastPetG = time; checkGrowth(); }
+  if(time - care.lastPetG > 30){ care.growth += 1; care.lastPetG = time; checkGrowth(); addCare(1); }
   for(let i=0;i<3;i++){
     hearts.push({x:dog.x+(Math.random()*20-10), y:dog.y-15-i*4, vy:-(21+Math.random()*15), life:1.2+i*0.15});
   }
@@ -1342,6 +1370,9 @@ document.getElementById("nameOk").addEventListener("click", ()=>{
   playerName = (document.getElementById("nameGirl").value.trim() || "はな").slice(0,8);
   dogName = (document.getElementById("nameDog").value.trim() || "ぽち").slice(0,8);
   namePanel.style.display = "none";
+  const today2 = new Date().toISOString().slice(0,10);
+  if(lastPlayDay !== today2){ lastPlayDay = today2; addCare(20); }
+  netDirty = true; netTimer = 2;
   markSave(); doSave();
   jingle();
   floatTexts.push({x:player.x, y:player.y-30, text:`${playerName}と${dogName}、おさんぽびより！`, t:2.4});
@@ -1453,6 +1484,7 @@ function updateRace(dt){
       R.prize = R.rank < 3 ? RACE_CLASSES[R.cls].prizes[R.rank] : 0;
       bells += R.prize;
       if(R.rank === 0) raceWins++;
+      addCare([8,4,2,1][R.rank] || 1);
       care.growth += 5; checkGrowth();
       markSave();
       R.state = "done"; R.doneT = R.t;
@@ -1558,6 +1590,7 @@ function toggleBook(){
     <div class="row"><span class="nm">🏁 レースゆうしょう</span><span>${raceWins}かい</span></div>
     <div class="row"><span class="nm">🐕 ${dName()}</span><span>${({puppy:"こいぬ",adult:"おとな",senior:"シニア"})[care.stage]} ・ そだちど ${care.growth}</span></div>
     <div class="row"><span class="nm">⏰ まえの おさんぽから</span><span>${fmtAbsence(lastAbsenceH)}</span></div>
+    <div class="row"><span class="nm">🏅 おせわ指数</span><span class="bells">${careScore}${rankInfo&&rankInfo.rank?`（${rankInfo.rank}い/${rankInfo.total}にん）`:""}</span></div>
     <div class="row"><span class="nm">🦴 かせき</span><span>${pocket.fossil}</span></div>`;
   bookPanel.style.display = "block";
 }
@@ -1627,6 +1660,7 @@ function feedDog(){
   foodStock--;
   care.hunger = Math.min(100, care.hunger + 40);
   care.growth += 5; checkGrowth();
+  addCare(2);
   feedAnimT = 1.6;
   dog.happyT = 1.6; dog.jumpT = 0.45;
   for(let i=0;i<2;i++) hearts.push({x:dog.x+(Math.random()*20-10), y:dog.y-16-i*4, vy:-(21+Math.random()*10), life:1.2});
@@ -1638,11 +1672,11 @@ function checkGrowth(){
   if(care.stage==="puppy" && care.growth>=120){
     care.stage = "adult";
     popup = { text:`🎉 ${dName()}は りっぱな おとなに なった！`, t:3.2 };
-    fanfare();
+    fanfare(); addCare(15);
   }else if(care.stage==="adult" && care.growth>=600){
     care.stage = "senior";
     popup = { text:`✨ ${dName()}は かんろくの シニアに なった`, t:3.2 };
-    jingle();
+    jingle(); addCare(15);
   }
   markSave();
 }
@@ -1701,6 +1735,14 @@ function update(dt){
   /* よるは おんがくも しずかに */
   const bgmTarget = phase.night > 0.5 ? 0.2 : 0.45;
   if(Math.abs(bgm.volume - bgmTarget) > 0.01) bgm.volume += (bgmTarget - bgm.volume) * Math.min(1, dt*1.2);
+
+  /* ランキング通信（45びょうごと） */
+  netTimer -= dt;
+  if(netTimer <= 0){
+    netTimer = 45;
+    if(netDirty){ netDirty = false; submitScore(); }
+    else fetchRank();
+  }
 
   if(actPressed){ tryAction(); actPressed = false; }
   updateCare(dt);
@@ -1837,7 +1879,7 @@ function update(dt){
       ball.state = "none";
       dog.happyT = 1.5; dog.sayT = 1.2; dog.jumpT = 0.45;
       floatTexts.push({x:dog.x, y:dog.y-18, text:`${dName()}、えらい！`, t:1.6});
-      care.growth += 3; checkGrowth();
+      care.growth += 3; checkGrowth(); addCare(2);
       for(let i=0;i<3;i++) hearts.push({x:dog.x+(Math.random()*20-10), y:dog.y-15-i*4, vy:-(21+Math.random()*15), life:1.2});
       bark();
       trail.length = 0; lastTrail = {x:player.x, y:player.y};
@@ -2799,6 +2841,21 @@ function drawUI(){
   roundRect(uictx, 4*csc, 14*csc, tw2+6*csc, 7.8*csc, 3.9*csc, "rgba(255,255,255,0.84)");
   uictx.fillStyle = care.sick ? "#c0392b" : "#8a5f47";
   uictx.fillText(label2, 7*csc, 18*csc);
+  /* ランキングチップ（おせわ指数と順位を常時表示） */
+  let label3;
+  if(rankInfo && rankInfo.rank){
+    const crown = rankInfo.rank===1 ? "👑" : rankInfo.rank===2 ? "🥈" : rankInfo.rank===3 ? "🥉" : "🏅";
+    const gapTxt = rankInfo.rank===1 ? "いま トップ！" : `つぎまで あと${rankInfo.gap}`;
+    label3 = `${crown}${rankInfo.rank}い/${rankInfo.total}にん  指数${careScore}  ${gapTxt}`;
+  }else{
+    label3 = `🏅 おせわ指数 ${careScore}`;
+  }
+  const fs3 = Math.max(10, 4.2*csc);
+  uictx.font = `bold ${fs3}px 'Hiragino Maru Gothic ProN', sans-serif`;
+  const tw3 = uictx.measureText(label3).width;
+  roundRect(uictx, 4*csc, 23.6*csc, tw3+6*csc, 7.8*csc, 3.9*csc, "rgba(255,246,220,0.9)");
+  uictx.fillStyle = "#a8762e";
+  uictx.fillText(label3, 7*csc, 27.6*csc);
 
   for(const f of floatTexts){
     const [sx,sy] = W2S(f.x, f.y);
@@ -2949,6 +3006,19 @@ function roundRect(g,x,y,w,h,r,fill){
 
 /* ================= メインループ ================= */
 loadSave();
+if(!playerId){
+  playerId = (crypto.randomUUID ? crypto.randomUUID() : "id-"+Date.now()+"-"+Math.random().toString(36).slice(2));
+  markSave();
+}
+{
+  const today = new Date().toISOString().slice(0,10);
+  if(playerName && lastPlayDay !== today){
+    lastPlayDay = today;
+    addCare(20);
+    setTimeout(()=>{ floatTexts.push({x:player.x, y:player.y-36, text:"まいにちボーナス +20 ✨", t:2.6}); popSound(); }, 5200);
+  }
+}
+setTimeout(()=>{ if(playerName) submitScore(); }, 2500);
 document.body.classList.toggle("hasball", hasBall);
 updateFeedBtn();
 if(!playerName){
@@ -3001,7 +3071,9 @@ window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundIte
   get absence(){ return lastAbsenceH; },
   dogMood,
   openShop, toggleBook, openNamePanel, openRaceGate, startRace,
-  care, poops, feedDog, checkGrowth, dogAction,
+  care, poops, feedDog, checkGrowth, dogAction, addCare, submitScore, fetchRank,
+  get careScore(){ return careScore; },
+  get rankInfo(){ return rankInfo; },
   toggleMap:()=>{ mapOpen = !mapOpen; },
   get mapOpen(){ return mapOpen; },
   forceSick:()=>setSick(),

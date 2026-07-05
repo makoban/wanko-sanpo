@@ -1,0 +1,8 @@
+name = "wanko-rank"
+main = "worker.js"
+compatibility_date = "2026-07-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "wanko-rank"
+database_id = "6db6c01c-6743-481b-bb24-fa39c4b48c8d"
