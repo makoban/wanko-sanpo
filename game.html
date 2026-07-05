@@ -334,7 +334,9 @@ function placeStick(bx,by,kx,ky){
   stickKnob.style.left = kx+"px"; stickKnob.style.top = ky+"px";
 }
 stage.addEventListener("touchstart", e=>{
-  if(e.target.closest(".panel") || e.target===muteBtn || e.target===bookBtn || e.target===ballBtn2 || e.target.id==="feedBtn") return;
+  if(e.target.closest(".panel")) return;
+  /* ボタンはそれぞれのclickに任せる（🐾だけはここで即時処理） */
+  if(e.target.tagName === "BUTTON" && e.target !== actBtn) return;
   /* レースちゅうは タップ＝おうえん れんだ */
   if(race){ actPressed = true; e.preventDefault(); return; }
   /* ちずが ひらいていたら とじる */
