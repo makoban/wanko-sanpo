@@ -574,10 +574,36 @@ function sliceSheet(img, facesLeft){
 /* --- 街オブジェクトのドット絵（v5）。未読込時はプログラム描画にフォールバック --- */
 const TOWN = {};
 ["house-red","house-blue","house-green","house-yellow","tree","tree-sakura",
- "fountain","stall","bench","lamp","bush","racegate","dock"].forEach(n=>{
+ "fountain","stall","bench","lamp","bush","racegate","dock",
+ /* v7：まちのげんきど 状態差分・装飾 */
+ "tree-kare","tree-sakura-kare","tree-mankai","tree-hikari",
+ "fountain-yodomi","fountain-niji","stall-oyasumi","stall-nigiwai",
+ "bench-koke","lamp-kire",
+ "garland","hana-arch","fuusen-set","chochin","party-flag","picnic","stage-mini","cart",
+ "hana-shiore","hana-tsubomi","hana-mankai","hana-hikari",
+ "kusa-kare","zassou","mizutamari","ochiba","clover","kirakusa"].forEach(n=>{
   const im = new Image();
   im.onload = ()=>{ TOWN[n] = im; };
   im.src = "sprites/town/" + n + ".png";
+});
+/* --- v7：おきゃくさまシート・げんきどアイコン --- */
+["poppo","beechan"].forEach(n=>{
+  const im = new Image();
+  im.onload = ()=>{
+    SPR[n] = sliceSheet(im, false);
+    if(typeof VILLAGERS !== "undefined"){
+      for(const v of VILLAGERS) if(v.key===n) v.h = SPR[n].down[0].h;
+    }
+  };
+  im.src = "sprites/48/" + n + ".png";
+});
+const VIMG = {};
+[["visitors","kotori-tai"],["visitors","yousei"],
+ ["icon2","genki-sun"],["icon2","genki-kumo"],["icon2","genki-ame"],
+ ["icon2","machi-heart"],["icon2","hana-mark"]].forEach(([cat,n])=>{
+  const im = new Image();
+  im.onload = ()=>{ VIMG[n] = im; };
+  im.src = "sprites/items/" + cat + "/" + n + ".png";
 });
 /* --- レースのライバル犬（v5） --- */
 const RIVALS = {};
@@ -660,8 +686,13 @@ let playerName = "", dogName = "", raceWins = 0;
 const RANK_API = "https://wanko-rank.ai-fudosan.workers.dev";
 let careScore = 0, playerId = "", lastPlayDay = "";
 let rankInfo = null, netDirty = true, netTimer = 5;
+/* --- まちのげんきど（0〜100）：お世話で上がり、実時間放置で下がる --- */
+let spirit = 50;
+const spiritTier = ()=> spirit < 25 ? 0 : spirit < 60 ? 1 : spirit < 85 ? 2 : 3;
+const vActive = v => !(v.tourist && spiritTier() < 3);   /* おきゃくさまは きらきらの まちにだけ */
 function addCare(n){
   careScore = Math.max(0, Math.min(999999, careScore + n));
+  if(n > 0) spirit = clamp(spirit + n*0.6, 0, 100);
   netDirty = true;
   markSave();
 }
@@ -695,6 +726,7 @@ function applyAbsence(offH){
   lastAbsenceH = offH;
   if(offH < 0.1) return;
   careScore = Math.max(0, careScore - Math.floor(offH/2));   /* ほったらかしは 指数もさがる（2時間で-1） */
+  spirit = Math.max(0, spirit - offH);                        /* まちも 1時間で-1 しずんでいく */
   netDirty = true;
   care.hunger = Math.max(0, care.hunger - offH*(100/24));
   const poopN = Math.min(3, Math.floor(offH/20));
@@ -723,7 +755,7 @@ function doSave(){
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       bells, hasBall, bandana, petCount, playerName, dogName, raceWins,
       foodStock, medCount, care, poops, savedAt: Date.now(),
-      careScore, playerId, lastPlayDay,
+      careScore, playerId, lastPlayDay, spirit,
       apple:pocket.apple, fossil:pocket.fossil,
       fishInv, bugInv,
       caughtFish:[...caughtFish], caughtBug:[...caughtBug],
@@ -741,6 +773,7 @@ function loadSave(){
     playerName = d.playerName||""; dogName = d.dogName||"";
     raceWins = d.raceWins||0;
     careScore = d.careScore||0; playerId = d.playerId||""; lastPlayDay = d.lastPlayDay||"";
+    if(d.spirit != null) spirit = clamp(d.spirit, 0, 100);
     foodStock = d.foodStock||0; medCount = d.medCount||0;
     if(d.care) Object.assign(care, d.care);
     if(!playerName) care.stage = "puppy";               /* はじめてなら こいぬから */
@@ -907,7 +940,16 @@ const VILLAGERS = [
   { name:"ノロん", key:"noron", tag:"#a8763e",
     img: makeVillager(HEAD_DEER, {s:"#d9a066", m:"#f2d8b0", k:"#8a5a3a", T:"#3f6d6a", t:"#5f8d8a"}),
     hx:14*T, hy:7.5*T, pitch:400,
-    lines:["みずうみの にしに ひみつの はなばたけが あるんだ","もりは しずかで おちつくなあ","つの、ちょっと じまんなんだ"] }
+    lines:["みずうみの にしに ひみつの はなばたけが あるんだ","もりは しずかで おちつくなあ","つの、ちょっと じまんなんだ"] },
+  /* v7：きらきらの まちにだけ あそびにくる おきゃくさま */
+  { name:"ポッポさん", key:"poppo", tag:"#8a93a3", tourist:true,
+    img: makeVillager(HEAD_BEAR, {s:"#9aa3b0", m:"#c3ccd8", T:"#b8646a", t:"#d08a90"}),
+    hx:21.5*T, hy:22.5*T, pitch:360,
+    lines:["たびの とちゅうに よってみたんだ。にぎやかで いい まちだねえ","この まちの うわさ、となりまちまで きこえてるよ！","おはなの かおりが する まちは、いい まちなんだ"] },
+  { name:"ビーちゃん", key:"beechan", tag:"#e8b93e", tourist:true,
+    img: makeVillager(HEAD_BEAR, {s:"#ffd95e", m:"#fff0b8", T:"#8a5a3a", t:"#b58a5a"}),
+    hx:17.5*T, hy:27.5*T, pitch:700,
+    lines:["はちみつ いかが〜？ …なんてね、きょうは あそびに きたの♪","おはなが いっぱいだから ミツバチも うれしいの","げんきな まちには あまーい かおりが するのよ〜"] }
 ];
 for(const v of VILLAGERS){
   v.x = v.hx; v.y = v.hy;
@@ -1128,7 +1170,7 @@ const QUEST_TYPES = [
 function activeQuests(){ return VILLAGERS.filter(v=>v.quest).length; }
 function tryAssignQuest(){
   if(activeQuests() >= 3) return;
-  const free = VILLAGERS.filter(v=>!v.quest);
+  const free = VILLAGERS.filter(v=>!v.quest && !v.tourist);
   if(!free.length) return;
   const v = free[Math.floor(Math.random()*free.length)];
   const q = QUEST_TYPES[Math.floor(Math.random()*QUEST_TYPES.length)];
@@ -1179,12 +1221,29 @@ function startDialog(v){
     text = `おさんぽみちが よごれてるよ〜。${dName()}のために きれいに しようね`;
   }else if(lastAbsenceH >= 24 && !v.saidOkaeri){
     v.saidOkaeri = true;
-    text = `おかえり ${pName()}！ ${dName()}、${fmtAbsence(lastAbsenceH)}も ずっと まってたんだよ`;
+    text = `おかえり ${pName()}！ ${dName()}、${fmtAbsence(lastAbsenceH)}も ずっと まってたんだよ`
+         + (spirit < 25 ? "。…まちも すっかり どんより しちゃった" : "");
   }else if(v.quest){
     text = v.quest.ask;
   }else{
-    text = v.lines[v.lineI % v.lines.length];
-    v.lineI++;
+    /* げんきどと なかよし度で セリフの おんどが かわる */
+    const gT = spiritTier();
+    const warmth = Math.random() < (v.love >= 2 ? 0.55 : 0.35);
+    if(!v.tourist && gT === 0 && Math.random() < 0.55){
+      const cold = ["…ひさしぶりだね。","さいきん、まちが しずかで さみしいよ…",
+        `${dName()}を だいじに してあげてよ`,"おはなたち、みずを ほしがってたよ…",
+        "ふんすいも とまっちゃったね。…どうしてかな"];
+      text = cold[Math.floor(Math.random()*cold.length)];
+    }else if(!v.tourist && gT === 3 && warmth){
+      const warm = [`${pName()}が いると まちが あかるいね！`,
+        "まいにち ありがとう♪ おはなも うれしそう！",
+        `${dName()}、いつも たのしそうだね〜`,
+        "きょうも きらきらの いちにちだね！","おきゃくさままで あそびに きてるよ！ すごいね！"];
+      text = warm[Math.floor(Math.random()*warm.length)];
+    }else{
+      text = v.lines[v.lineI % v.lines.length];
+      v.lineI++;
+    }
     if(time - v.lastTalk > 30){ v.love = Math.min(5, v.love + 0.34); v.lastTalk = time; markSave(); }
   }
   dialog = { v, text, chars:0 };
@@ -1254,6 +1313,7 @@ function tryAction(){
   const cands = [];
   /* 住民 */
   for(const v of VILLAGERS){
+    if(!vActive(v)) continue;
     const d = dist(player.x,player.y, v.x,v.y);
     if(d < 39) cands.push({d:d*0.8, f:()=>startDialog(v)});
   }
@@ -1917,6 +1977,7 @@ function update(dt){
   for(const v of VILLAGERS){
     const nearPlayer = dist(player.x,player.y, v.x,v.y) < 42;
     if(dialog && dialog.v === v){ v.state = "idle"; continue; }
+    if(!vActive(v)){ v.state = "idle"; v.x = v.hx; v.y = v.hy; v.tx = v.hx; v.ty = v.hy; continue; }
     if(phase.night > 0.85){ v.state = "idle"; continue; }   /* よふけは しずかに おやすみ */
     v.wt -= dt;
     if(nearPlayer){ v.state = "idle"; v.wt = Math.max(v.wt, 0.6); }
@@ -2051,7 +2112,7 @@ function update(dt){
     c.x += c.v*dt;
     if(c.x > MW*T+80) c.x = -80;
   }
-  if(popup){ popup.t -= dt; if(popup.t<=0) popup = null; }
+  if(popup){ popup.t -= dt; popup.age = (popup.age||0) + dt; if(popup.t<=0) popup = null; }
   for(let i=floatTexts.length-1;i>=0;i--){
     const f = floatTexts[i];
     f.t -= dt; f.y -= 14*dt;
@@ -2067,6 +2128,7 @@ function update(dt){
 let cam = {x:0,y:0};
 
 function drawGround(){
+  const gTier = spiritTier();
   const x0 = Math.floor(cam.x/T), y0 = Math.floor(cam.y/T);
   for(let ty=y0; ty<=y0+VH/T; ty++){
     for(let tx=x0; tx<=x0+VW/T; tx++){
@@ -2084,14 +2146,40 @@ function drawGround(){
         }
         if(h%23===0){ ctx.fillStyle="#fff"; ctx.fillRect(px+(h%18)+3, py+((h>>4)%18)+3, 3,3); }
       }
+      /* げんきどで かわる くさはらの ようす */
+      if(v==="g"){
+        if(gTier===0){
+          if(h%13===0 && TOWN["kusa-kare"]) ctx.drawImage(TOWN["kusa-kare"], px+1, py+5);
+          else if(h%17===0 && TOWN["zassou"]) ctx.drawImage(TOWN["zassou"], px+1, py+3);
+          else if(h%29===0 && TOWN["mizutamari"]) ctx.drawImage(TOWN["mizutamari"], px+1, py+8);
+          else if(h%23===2 && TOWN["ochiba"]) ctx.drawImage(TOWN["ochiba"], px+1, py+4);
+        }else if(gTier===3){
+          if(h%19===0 && TOWN["clover"]) ctx.drawImage(TOWN["clover"], px+1, py+4);
+          else if(h%31===0 && TOWN["kirakusa"]) ctx.drawImage(TOWN["kirakusa"], px+1, py+3);
+        }
+      }
       if(v==="f"){
-        const cols = ["#ff6f91","#ffd166","#ffffff","#c58bf2"];
-        for(let i=0;i<3;i++){
-          const fx = px+3+((h>>(i*3))%15), fy = py+3+((h>>(i*3+2))%15);
-          ctx.fillStyle = "#4f9c3d"; ctx.fillRect(fx+2,fy+3,2,5);
-          ctx.fillStyle = cols[(h>>i)%4];
-          ctx.fillRect(fx,fy,5,2); ctx.fillRect(fx+1,fy-1,3,4);
-          ctx.fillStyle = "#ffe9a8"; ctx.fillRect(fx+2,fy,1,1);
+        if(gTier===0){
+          /* どんより：はなが しおれる */
+          const im = TOWN["hana-shiore"];
+          if(im){
+            ctx.drawImage(im, px+2+(h%6), py+4+((h>>3)%4));
+          }else{
+            ctx.fillStyle="#8a6a3a"; ctx.fillRect(px+8,py+10,2,7);
+            ctx.fillStyle="#a8763e"; ctx.fillRect(px+6,py+14,5,3);
+          }
+        }else{
+          const cols = ["#ff6f91","#ffd166","#ffffff","#c58bf2"];
+          for(let i=0;i<3;i++){
+            const fx = px+3+((h>>(i*3))%15), fy = py+3+((h>>(i*3+2))%15);
+            ctx.fillStyle = "#4f9c3d"; ctx.fillRect(fx+2,fy+3,2,5);
+            ctx.fillStyle = cols[(h>>i)%4];
+            ctx.fillRect(fx,fy,5,2); ctx.fillRect(fx+1,fy-1,3,4);
+            ctx.fillStyle = "#ffe9a8"; ctx.fillRect(fx+2,fy,1,1);
+          }
+          if(gTier>=2 && h%4===0 && TOWN["hana-mankai"]) ctx.drawImage(TOWN["hana-mankai"], px+2, py+4);
+          if(gTier===3 && h%7===1 && TOWN["hana-hikari"]) ctx.drawImage(TOWN["hana-hikari"], px+2, py+2);
+          if(gTier===1 && h%6===0 && TOWN["hana-tsubomi"]) ctx.drawImage(TOWN["hana-tsubomi"], px+5, py+5);
         }
       }
       if(v==="p"){
@@ -2140,10 +2228,16 @@ function drawTree(tr){
   const x = tr.tx*T, y = tr.ty*T;
   let s = Math.round(Math.sin(time*0.9 + tr.tx*0.7));
   if(tr.shakeT > 0.2) s = Math.round(Math.sin(time*32)*2);
-  const im = tr.cherry ? TOWN["tree-sakura"] : TOWN.tree;
+  const gT = spiritTier();
+  let im = tr.cherry ? TOWN["tree-sakura"] : TOWN.tree;
+  if(gT===0){
+    im = (tr.cherry ? TOWN["tree-sakura-kare"] : TOWN["tree-kare"]) || im;
+  }else if(gT===3 && !tr.cherry && !tr.fruit){
+    im = (((tr.tx*7+tr.ty*13)%5===0) ? TOWN["tree-hikari"] : TOWN["tree-mankai"]) || im;
+  }
   if(im){
     ctx.drawImage(im, Math.round(x+12+s-im.width/2), Math.round(y+26-im.height));
-    if(tr.fruit && tr.fruitN>0){
+    if(tr.fruit && tr.fruitN>0 && gT>0){
       const offs = [[-11,-31],[1,-40],[7,-26]];
       for(let i=0;i<tr.fruitN;i++){
         const ax = x+12+s+offs[i][0], ay = y+offs[i][1];
@@ -2213,11 +2307,14 @@ function drawHouse(h, nightF){
 
 function drawFountain(){
   const cx = (FOUNTAIN.tx+2)*T, cy = (FOUNTAIN.ty+2)*T;
-  if(TOWN.fountain){
-    const im = TOWN.fountain;
-    ctx.drawImage(im, Math.round(cx-im.width/2), Math.round(FOUNTAIN.ty*T + 98 - im.height));
-    /* みずの きらめき */
-    for(let i=0;i<3;i++){
+  const gT = spiritTier();
+  const fim = gT===0 ? (TOWN["fountain-yodomi"] || TOWN.fountain)
+            : gT===3 ? (TOWN["fountain-niji"]   || TOWN.fountain)
+            : TOWN.fountain;
+  if(fim){
+    ctx.drawImage(fim, Math.round(cx-fim.width/2), Math.round(FOUNTAIN.ty*T + 98 - fim.height));
+    /* みずの きらめき（よどんでいる ときは なし） */
+    if(gT>0) for(let i=0;i<3;i++){
       if(Math.floor(time*3+i*7)%5===i%3){
         ctx.fillStyle = "rgba(255,255,255,0.85)";
         ctx.fillRect(cx-26+((i*23+Math.floor(time*2)*13)%52), FOUNTAIN.ty*T+52+((i*11)%22), 3, 3);
@@ -2255,9 +2352,12 @@ function drawFountain(){
 
 function drawStall(){
   const x = STALL.tx*T, y = STALL.ty*T;
-  if(TOWN.stall){
-    const im = TOWN.stall;
-    ctx.drawImage(im, Math.round(x + 24 - im.width/2), Math.round(y + 50 - im.height));
+  const sgT = spiritTier();
+  const sim = sgT===0 ? (TOWN["stall-oyasumi"] || TOWN.stall)
+            : sgT===3 ? (TOWN["stall-nigiwai"] || TOWN.stall)
+            : TOWN.stall;
+  if(sim){
+    ctx.drawImage(sim, Math.round(x + 24 - sim.width/2), Math.round(y + 50 - sim.height));
     return;
   }
   /* カウンター */
@@ -2286,8 +2386,9 @@ function drawStall(){
 
 function drawBench(b){
   const x = b.tx*T, y = b.ty*T;
-  if(TOWN.bench){
-    ctx.drawImage(TOWN.bench, Math.round(x + 24 - TOWN.bench.width/2), Math.round(y + 24 - TOWN.bench.height));
+  const bim = (spiritTier()===0 ? TOWN["bench-koke"] : null) || TOWN.bench;
+  if(bim){
+    ctx.drawImage(bim, Math.round(x + 24 - bim.width/2), Math.round(y + 24 - bim.height));
     return;
   }
   ctx.fillStyle="#4a3228"; ctx.fillRect(x+2,y+5,45,15);
@@ -2298,12 +2399,15 @@ function drawBench(b){
 }
 function drawLamp(l, nightF){
   const x = l[0]*T, y = l[1]*T;
-  if(TOWN.lamp){
-    const im = TOWN.lamp;
-    const ly = Math.round(y + 22 - im.height);
-    ctx.drawImage(im, Math.round(x + 12 - im.width/2), ly);
-    ctx.fillStyle = `rgba(255,220,130,${0.18+nightF*0.45})`;
-    ctx.beginPath(); ctx.arc(x+12, ly+9, 9+nightF*13, 0, 7); ctx.fill();
+  const kire = spiritTier()===0;
+  const lim = (kire ? TOWN["lamp-kire"] : null) || TOWN.lamp;
+  if(lim){
+    const ly = Math.round(y + 22 - lim.height);
+    ctx.drawImage(lim, Math.round(x + 12 - lim.width/2), ly);
+    /* きえかけの 街灯は あかりが よわい */
+    const glow = kire ? 0.05 + nightF*0.14 : 0.18 + nightF*0.45;
+    ctx.fillStyle = `rgba(255,220,130,${glow})`;
+    ctx.beginPath(); ctx.arc(x+12, ly+9, (kire?6:9)+nightF*(kire?7:13), 0, 7); ctx.fill();
     return;
   }
   ctx.fillStyle="#3f6d6a"; ctx.fillRect(x+10,y-6,5,27);
@@ -2631,6 +2735,7 @@ function drawWorld(){
   ctx.beginPath(); ctx.ellipse(player.x, player.y+4, 11,4,0,0,7); ctx.fill();
   ctx.beginPath(); ctx.ellipse(dog.x, dog.y+5, 12,4,0,0,7); ctx.fill();
   for(const v of VILLAGERS){
+    if(!vActive(v)) continue;
     ctx.beginPath(); ctx.ellipse(v.x, v.y+4, 11,4,0,0,7); ctx.fill();
   }
   if(ball.state!=="none"){
@@ -2665,6 +2770,32 @@ function drawWorld(){
   items.push({y:(FOUNTAIN.ty+FOUNTAIN.th)*T, f:drawFountain});
   items.push({y:(STALL.ty+2)*T, f:drawStall});
   items.push({y:(RACEGATE.ty+1)*T, f:drawRaceGate});
+  /* きらきらの まち：おいわいの かざりつけ */
+  if(spiritTier()===3){
+    const D = (n, cx, by, bob)=>{
+      const im = TOWN[n]; if(!im) return;
+      const oy = bob ? Math.round(Math.sin(time*1.8+cx)*2) : 0;
+      items.push({y:by, f:()=>ctx.drawImage(im, Math.round(cx-im.width/2), Math.round(by-im.height)+oy)});
+    };
+    D("garland",    19.5*T, 22.5*T);
+    D("fuusen-set", 14.0*T, 23.4*T, true);
+    D("fuusen-set", 25.9*T, 28.4*T, true);
+    D("hana-arch",  19.5*T, 30.8*T);
+    D("picnic",     23.5*T, 26.2*T);
+    D("cart",       16.2*T, 23.3*T);
+    D("party-flag", 22.2*T, 28.7*T);
+    D("chochin",    25.2*T, 23.6*T, true);
+    D("stage-mini", 10.5*T, 35.0*T);
+    /* ことりの合唱団と はなのようせい */
+    if(VIMG["kotori-tai"]){
+      const im = VIMG["kotori-tai"], kx = 29.5*T, ky = 40.6*T;
+      items.push({y:ky, f:()=>ctx.drawImage(im, Math.round(kx-im.width/2), Math.round(ky-im.height + Math.sin(time*2.4)*1.5))});
+    }
+    if(VIMG["yousei"]){
+      const im = VIMG["yousei"], fx2 = 10.2*T, fy2 = 38.4*T;
+      items.push({y:fy2, f:()=>ctx.drawImage(im, Math.round(fx2-im.width/2), Math.round(fy2-im.height-6 + Math.sin(time*1.6)*3))});
+    }
+  }
   for(const c of critters){
     items.push({y:c.y+12, f:()=>{
       const bob = Math.round(Math.sin(time*2.5+c.phase)*1.5);
@@ -2677,7 +2808,7 @@ function drawWorld(){
       }
     }});
   }
-  for(const v of VILLAGERS) items.push({y:v.y+3, f:()=>drawVillager(v)});
+  for(const v of VILLAGERS){ if(vActive(v)) items.push({y:v.y+3, f:()=>drawVillager(v)}); }
   for(const pp of poops){
     items.push({y:pp.y+2, f:()=>{
       if(POOPIMG.complete && POOPIMG.naturalWidth){
@@ -2790,6 +2921,7 @@ function drawUI(){
   }
   if(!dialog){
     for(const v of VILLAGERS){
+      if(!vActive(v)) continue;
       const d = dist(player.x,player.y, v.x,v.y);
       if(d < 39){
         const [sx,sy] = W2S(v.x, v.y - v.h - 6);
@@ -2845,7 +2977,8 @@ function drawUI(){
   /* おせわチップ */
   const stageTxt = ({puppy:"🐶こいぬ", adult:"🐕おとな", senior:"🎓シニア"})[care.stage] || "";
   const hungerIcon = care.hunger<25 ? "🍖⚠" : "🍖";
-  const label2 = `${hungerIcon}${Math.round(care.hunger)}%  🥫${foodStock}  💊${medCount}  ${stageTxt}`;
+  const spTxt = ["🌧どんより","⛅ふつう","🌼いきいき","✨きらきら"][spiritTier()];
+  const label2 = `${hungerIcon}${Math.round(care.hunger)}%  🥫${foodStock}  💊${medCount}  ${stageTxt}  ${spTxt}${Math.round(spirit)}`;
   const fs2 = Math.max(10, 4.2*csc);
   uictx.font = `bold ${fs2}px 'Hiragino Maru Gothic ProN', sans-serif`;
   const tw2 = uictx.measureText(label2).width;
@@ -2886,7 +3019,7 @@ function drawUI(){
     const pfs = Math.max(13, 5.8*sc);
     uictx.font = `bold ${pfs}px 'Hiragino Maru Gothic ProN', sans-serif`;
     const ptw = uictx.measureText(popup.text).width;
-    const scale = Math.min(1, (2.6-popup.t)*7);
+    const scale = clamp((popup.age==null ? 1 : popup.age)*7, 0.001, 1);
     const pw = Math.min(wpx*0.94, (ptw+14*sc))*scale, ph = 13*sc*scale;
     const px = wpx/2-pw/2, py = hpx*0.26-ph/2;
     roundRect(uictx, px, py, pw, ph, 6*sc*scale, "rgba(255,248,239,0.95)");
@@ -3083,6 +3216,7 @@ window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundIte
   dogMood,
   openShop, toggleBook, openNamePanel, openRaceGate, startRace,
   care, poops, feedDog, checkGrowth, dogAction, addCare, submitScore, fetchRank,
+  spiritTier, setSpirit:(v)=>{ spirit = clamp(v,0,100); }, getSpirit:()=>spirit,
   get careScore(){ return careScore; },
   get rankInfo(){ return rankInfo; },
   toggleMap:()=>{ mapOpen = !mapOpen; },
