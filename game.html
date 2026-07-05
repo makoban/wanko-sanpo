@@ -296,19 +296,22 @@ setInterval(()=>{
 const keys = {};
 let actPressed = false;
 window.addEventListener("keydown", e=>{
+  /* 入力欄でタイプ中は ゲーム操作を発動しない */
+  if(e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
   if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ","Spacebar"].includes(e.key)) e.preventDefault();
   if((e.key===" "||e.key==="Spacebar") && !keys[" "]) actPressed = true;
   if(e.key==="b" || e.key==="B") toggleBook();
   if((e.key==="z" || e.key==="Z") && hasBall && ball.state==="none" && !dialog && !fishing && !race) throwBall();
   if((e.key==="f" || e.key==="F") && !dialog && !fishing && !race) feedDog();
   if(e.key==="x" || e.key==="X") dogAction();
-  if(e.key==="m" || e.key==="M"){ mapOpen = !mapOpen; mapOpen ? uiOpen() : uiClose(); }
+  if((e.key==="m" || e.key==="M") && !race && !farewell){ mapOpen = !mapOpen; mapOpen ? uiOpen() : uiClose(); }
   if(e.key==="Escape"){ closePanels(); mapOpen = false; if(race) race = null; }
   keys[e.key] = true;
   if(e.key.length===1) keys[e.key.toLowerCase()] = true;
   initAudio();
 });
 window.addEventListener("keyup", e=>{
+  if(e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
   keys[e.key] = false;
   if(e.key.length===1) keys[e.key.toLowerCase()] = false;
 });
@@ -691,7 +694,7 @@ function fmtAbsence(h){
 function applyAbsence(offH){
   lastAbsenceH = offH;
   if(offH < 0.1) return;
-  careScore = Math.max(0, careScore - Math.floor(offH));   /* ほったらかしは 指数もさがる */
+  careScore = Math.max(0, careScore - Math.floor(offH/2));   /* ほったらかしは 指数もさがる（2時間で-1） */
   netDirty = true;
   care.hunger = Math.max(0, care.hunger - offH*(100/24));
   const poopN = Math.min(3, Math.floor(offH/20));
@@ -1360,6 +1363,7 @@ function closePanels(){
 }
 /* --- なまえ入力パネル --- */
 const namePanel = document.getElementById("namePanel");
+let nameOkDone = false;
 function openNamePanel(){
   document.getElementById("nameGirl").value = playerName;
   document.getElementById("nameDog").value = dogName;
@@ -1372,6 +1376,12 @@ document.getElementById("nameOk").addEventListener("click", ()=>{
   namePanel.style.display = "none";
   const today2 = new Date().toISOString().slice(0,10);
   if(lastPlayDay !== today2){ lastPlayDay = today2; addCare(20); }
+  /* はじめてのおさんぽセット（初回のみ） */
+  if(!nameOkDone && foodStock === 0 && bells < 100){
+    foodStock += 5; bells += 300; updateFeedBtn();
+    setTimeout(()=>{ popup = { text:"🎁 はじめてセット：ごはん5しょく と 300ベル！", t:4.5 }; }, 1500);
+  }
+  nameOkDone = true;
   netDirty = true; netTimer = 2;
   markSave(); doSave();
   jingle();
@@ -1427,7 +1437,7 @@ function startRace(cls){
   if(bells < C.fee){ floatTexts.push({x:player.x, y:player.y-20, text:"ベルが たりない…", t:1.5}); return; }
   bells -= C.fee; markSave();
   closePanels();
-  const base = [93,105,117][cls];
+  const base = [93,107,128][cls];
   const mkFrames = (col)=> SPR.dog ? SPR.dog.sideR.map(fr=>({c:tintCanvas(fr.c,col), w:fr.w, h:fr.h})) : null;
   race = { cls, state:"count", t:0, runT:0, L:1500, camX:0, gauge:0, heat:0,
     finished:[], lastC:0, rank:0, prize:0, doneT:0,
@@ -1563,6 +1573,7 @@ shopPanel.addEventListener("click", e=>{
   }
 });
 function toggleBook(){
+  if(race || farewell) return;
   if(bookPanel.style.display === "block"){ bookPanel.style.display="none"; uiClose(); return; }
   shopPanel.style.display = "none";
   uiOpen();
@@ -3054,7 +3065,7 @@ applyViewport();
 requestAnimationFrame(loop);
 
 /* デバッグ用フック */
-window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundItems, SPR, bgm,
+window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundItems, SPR, bgm, ground, solid,
   se:{bark, splash, thud, whoosh, pom, rustle, uiOpen, uiClose, fanfare, stepSfx, jingle, coinSfx, popSound},
   digSpots, ball, bugs,
   act:()=>{ actPressed = true; },
