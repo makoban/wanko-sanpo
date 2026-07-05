@@ -658,6 +658,29 @@ let foodStock = 0, medCount = 0;
 const care = { hunger: 85, stage: "adult", growth: 0, sick: false, sickT: 0, hungryT: 0, poopT: 0, lastPetG: -99 };
 const poops = [];
 let poopTimer = 0, feedAnimT = 0, dogIdleT = 0, farewell = null;
+let lastAbsenceH = 0, pendingFarewell = false;
+function fmtAbsence(h){
+  if(h >= 24) return `${Math.floor(h/24)}にちと ${Math.floor(h%24)}じかん`;
+  if(h >= 1) return `${Math.floor(h)}じかん`;
+  return "すこしのあいだ";
+}
+/* るすの じかんに おうじて じょうきょうが わるくなる
+   （まいにち30びょう おせわすれば だいじょうぶ。1にちで はらぺこ、2にちで びょうき、7にちで…） */
+function applyAbsence(offH){
+  lastAbsenceH = offH;
+  if(offH < 0.1) return;
+  care.hunger = Math.max(0, care.hunger - offH*(100/24));
+  const poopN = Math.min(3, Math.floor(offH/20));
+  for(let i=0; i<poopN && poops.length<4; i++){
+    poops.push({x: player.x + 40 + i*34, y: player.y + 28 + (i%2)*26});
+  }
+  if(offH >= 48 && !care.sick){ care.sick = true; care.sickT = 0; }
+  if(care.sick && offH >= 72) care.sickT = Math.max(care.sickT, Math.min(480, (offH-72)*8));
+  if(offH >= 168) pendingFarewell = true;   /* 1しゅうかん ほったらかすと… */
+}
+function dogMood(){
+  return care.sick ? "sick" : (care.hunger < 25 || poops.length >= 3) ? "sad" : "ok";
+}
 const pName = ()=> playerName || "あなた";
 const dName = ()=> dogName || "わんちゃん";
 const pocket = { apple:0, fossil:0 };
@@ -693,11 +716,9 @@ function loadSave(){
     if(d.care) Object.assign(care, d.care);
     if(!playerName) care.stage = "puppy";               /* はじめてなら こいぬから */
     if(Array.isArray(d.poops)) poops.push(...d.poops.slice(0,4));
-    /* るすの あいだの おなかの へり（さいだい6時間ぶん・るす中に おわかれは しない） */
+    /* るすの じかんを 反映（じっかんのある じかん経過） */
     if(d.savedAt){
-      const off = Math.min((Date.now()-d.savedAt)/1000, 6*3600);
-      care.hunger = Math.max(0, care.hunger - off/45);
-      if(care.hunger<=0 && off>3600 && !care.sick){ care.sick = true; care.sickT = 0; }
+      applyAbsence(Math.max(0, (Date.now()-d.savedAt)/3600000));
     }
     pocket.apple = d.apple||0; pocket.fossil = d.fossil||0;
     Object.assign(fishInv, d.fishInv||{});
@@ -1119,6 +1140,16 @@ function startDialog(v){
     fanfare();
     for(let i=0;i<3;i++) hearts.push({x:v.x+(Math.random()*20-10), y:v.y-24-i*4, vy:-(21+Math.random()*12), life:1.3});
     markSave();
+  }else if(care.sick){
+    text = medCount>0 ? `${dName()}の ぐあいが わるいよ！ はやく 🐾で おくすりを あげて！`
+                      : `${dName()}が びょうき みたい…。商店で おくすりを かってあげて！`;
+  }else if(care.hunger < 25){
+    text = `ねえ、${dName()}が おなかを すかせてるよ…。ごはんを あげてね`;
+  }else if(poops.length >= 2){
+    text = `おさんぽみちが よごれてるよ〜。${dName()}のために きれいに しようね`;
+  }else if(lastAbsenceH >= 24 && !v.saidOkaeri){
+    v.saidOkaeri = true;
+    text = `おかえり ${pName()}！ ${dName()}、${fmtAbsence(lastAbsenceH)}も ずっと まってたんだよ`;
   }else if(v.quest){
     text = v.quest.ask;
   }else{
@@ -1526,6 +1557,7 @@ function toggleBook(){
     <div class="row"><span class="nm">💗 なでなで</span><span>${petCount}</span></div>
     <div class="row"><span class="nm">🏁 レースゆうしょう</span><span>${raceWins}かい</span></div>
     <div class="row"><span class="nm">🐕 ${dName()}</span><span>${({puppy:"こいぬ",adult:"おとな",senior:"シニア"})[care.stage]} ・ そだちど ${care.growth}</span></div>
+    <div class="row"><span class="nm">⏰ まえの おさんぽから</span><span>${fmtAbsence(lastAbsenceH)}</span></div>
     <div class="row"><span class="nm">🦴 かせき</span><span>${pocket.fossil}</span></div>`;
   bookPanel.style.display = "block";
 }
@@ -1633,17 +1665,24 @@ function newPuppy(){
 }
 
 /* ================= 更新 ================= */
-let time = 0, dayOffset = 0;
-const DAY_LEN = 240;
+let time = 0;
+/* ほんものの とけいに あわせた ひるとよる */
+let hourOverride = null;   /* デバッグ用 */
+function realHour(){
+  if(hourOverride !== null) return hourOverride;
+  const d = new Date();
+  return d.getHours() + d.getMinutes()/60;
+}
 function dayPhase(){
-  const t = (time + dayOffset) % DAY_LEN;
-  /* 0-140昼, 140-170ゆうやけ, 170-225よる, 225-240あさ */
+  const h = realHour();
   let sun = 0, night = 0;
-  if(t>=140 && t<170) sun = Math.sin((t-140)/30*Math.PI);
-  if(t>=170 && t<225) night = Math.min(1, (t-170)/12);
-  else if(t>=225) night = Math.max(0, 1-(t-225)/15);
-  if(t>=225) sun = Math.sin((t-225)/15*Math.PI)*0.5;
-  return {sun, night, isNight: night>0.5};
+  if(h >= 16 && h < 18.5) sun = Math.sin((h-16)/2.5*Math.PI);          /* ゆうやけ */
+  if(h >= 18 && h < 20) night = (h-18)/2;
+  else if(h >= 20 || h < 4.5) night = 1;                                /* よる */
+  else if(h >= 4.5 && h < 6) night = 1-(h-4.5)/1.5;                     /* よあけ */
+  if(h >= 4.5 && h < 6.5) sun = Math.max(sun, Math.sin((h-4.5)/2*Math.PI)*0.5);  /* あさやけ */
+  night = Math.max(0, Math.min(1, night));
+  return {sun: Math.max(0, sun*(1-night*0.7)), night, isNight: night > 0.5};
 }
 function update(dt){
   time += dt;
@@ -1658,6 +1697,10 @@ function update(dt){
   }
   if(race){ updateRace(dt); return; }
   if(mapOpen) actPressed = false;   /* ちずを見ているあいだは アクションしない */
+
+  /* よるは おんがくも しずかに */
+  const bgmTarget = phase.night > 0.5 ? 0.2 : 0.45;
+  if(Math.abs(bgm.volume - bgmTarget) > 0.01) bgm.volume += (bgmTarget - bgm.volume) * Math.min(1, dt*1.2);
 
   if(actPressed){ tryAction(); actPressed = false; }
   updateCare(dt);
@@ -1753,7 +1796,7 @@ function update(dt){
     dog.comeT -= dt;
     const dx = player.x-dog.x, dy = player.y-dog.y, d = Math.hypot(dx,dy);
     if(d > 26){
-      const dsp = 170*dt;
+      const dsp = 170*dt * (dogMood()==="ok" ? 1 : 0.6);
       dog.x += dx/d*dsp; dog.y += dy/d*dsp;
       dog.moving = true;
       if(Math.abs(dx) > 1.5) dog.face = dx>0?"r":"l";
@@ -1804,7 +1847,7 @@ function update(dt){
     const tgt = trail[0];
     const dx = tgt.x-dog.x, dy = tgt.y-dog.y;
     const d = Math.hypot(dx,dy);
-    const dsp = (trail.length>16 ? 180 : 111)*dt;
+    const dsp = (trail.length>16 ? 180 : 111)*dt * (dogMood()==="ok" ? 1 : 0.55);   /* しょんぼり中はとぼとぼ */
     if(d > 2){
       dog.x += dx/d*dsp; dog.y += dy/d*dsp;
       dog.moving = true;
@@ -1821,6 +1864,7 @@ function update(dt){
   for(const v of VILLAGERS){
     const nearPlayer = dist(player.x,player.y, v.x,v.y) < 42;
     if(dialog && dialog.v === v){ v.state = "idle"; continue; }
+    if(phase.night > 0.85){ v.state = "idle"; continue; }   /* よふけは しずかに おやすみ */
     v.wt -= dt;
     if(nearPlayer){ v.state = "idle"; v.wt = Math.max(v.wt, 0.6); }
     else if(v.wt <= 0){
@@ -2394,6 +2438,7 @@ function drawDogIcon(){
   let ic = null;
   if(care.sick) ic = ICONS.sick;
   else if(care.hunger < 25) ic = ICONS.haraheri;
+  else if(poops.length >= 3) ic = ICONS.ase;
   else if(dogIdleT > 30 && !dog.moving) ic = ICONS.zzz;
   if(ic && ic.complete){
     const bob = Math.round(Math.sin(time*3)*2);
@@ -2407,7 +2452,7 @@ function drawDog(){
     let pimg = null;
     if(care.sick && POSE.sick && POSE.sick.complete) pimg = POSE.sick;
     else if(dogIdleT > 30 && POSE.sleep && POSE.sleep.complete) pimg = POSE.sleep;
-    else if(dogIdleT > 12 && POSE.fuse && POSE.fuse.complete) pimg = POSE.fuse;
+    else if(dogIdleT > (dogMood()==="sad" ? 4 : 12) && POSE.fuse && POSE.fuse.complete) pimg = POSE.fuse;
     if(pimg){
       ctx.save();
       if(dog.face === "r"){
@@ -2910,6 +2955,22 @@ if(!playerName){
   care.stage = "puppy";                            /* はじめてなら こいぬから育てる */
   setTimeout(openNamePanel, 600);
 }
+/* おかえりメッセージ：るすの じかんと わんこの ようすを つたえる */
+if(lastAbsenceH >= 6 && playerName){
+  setTimeout(()=>{ popup = { text:`⏰ るすに していた じかん：${fmtAbsence(lastAbsenceH)}`, t:4.5 }; }, 1000);
+  setTimeout(()=>{
+    if(farewell || pendingFarewell) return;
+    const msg = care.sick ? `${dName()}が びょうきに なっちゃった…！` :
+                care.hunger < 25 ? `${dName()}は おなか ぺこぺこで まってた…` :
+                `${dName()}が しっぽを ふって まってたよ！`;
+    floatTexts.push({x:dog.x, y:dog.y-32, text:msg, t:3.2});
+    if(care.sick || care.hunger < 25) sfx("sine", 340, 0.4, 0.09, 170);
+  }, 3000);
+}
+if(pendingFarewell){
+  pendingFarewell = false;
+  setTimeout(()=>{ if(!farewell) startFarewell(); }, 4500);
+}
 let last = performance.now();
 function loop(now){
   const dt = Math.min(0.05, (now-last)/1000);
@@ -2935,7 +2996,10 @@ window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundIte
   get bells(){ return bells; },
   addBells:(n)=>{ bells += n; },
   setBall:(v)=>{ hasBall = v; },
-  setDayT:(t)=>{ dayOffset = t - (time % DAY_LEN); },
+  setHour:(h)=>{ hourOverride = h; },
+  applyAbsence,
+  get absence(){ return lastAbsenceH; },
+  dogMood,
   openShop, toggleBook, openNamePanel, openRaceGate, startRace,
   care, poops, feedDog, checkGrowth, dogAction,
   toggleMap:()=>{ mapOpen = !mapOpen; },
