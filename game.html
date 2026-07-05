@@ -152,6 +152,14 @@
     vertical-align:-7px; margin-right:7px;
   }
   #namePanel{ inset:auto 8%; top:10%; z-index:30; }
+  #promisePanel{ inset:auto 6%; top:6%; z-index:40; display:block; text-align:center; line-height:1.85; }
+  #promisePanel .promise-warn{
+    margin:10px auto; padding:8px 12px; max-width:430px;
+    background:#fff0f3; border:2px dashed #ff8fae; border-radius:12px; color:#c05577;
+  }
+  #promisePanel .promise-btns{ display:flex; flex-direction:column; gap:9px; margin-top:12px; align-items:center; }
+  #promisePanel #promiseOk{ font-size:15px; padding:8px 22px; }
+  #promisePanel #promiseNo{ background:#cbb9a5; box-shadow:0 2px 0 rgba(140,110,80,.5); }
   .name-row{ margin:14px 0 4px; }
   .name-row label{ display:block; font-size:13px; margin-bottom:5px; color:#8a5f47; font-weight:bold; }
   .panel input{
@@ -232,6 +240,16 @@
         <input id="nameDog" maxlength="8" placeholder="ぽち">
       </div>
       <button id="nameOk" class="name-ok">これで はじめる！</button>
+    </div>
+    <div id="promisePanel" class="panel">
+      <h2>🐾 あそぶまえの おやくそく</h2>
+      <p>わんこと あそぶなら、<b>1にち 30びょう</b>でも いいので、<br>ちゃんと <b>おせわ</b>（🍖 ごはん ・ 🐾 なでなで）を してあげてね。</p>
+      <p class="promise-warn">それが できないなら……<br>おねがいだから、<b>あそばないで</b> あげてください。</p>
+      <p id="promiseWait">わんこは、あなたが くるのを ずっと まっています。</p>
+      <div class="promise-btns">
+        <button id="promiseOk">🐾 やくそくする！ あそぶ</button>
+        <button id="promiseNo">ごめんね、また こんど…</button>
+      </div>
     </div>
     <div id="racePanel" class="panel"></div>
   </div>
@@ -3163,6 +3181,22 @@ if(!playerId){
   }
 }
 setTimeout(()=>{ if(playerName) submitScore(); }, 2500);
+
+/* --- あそぶまえの おやくそく（まいかい ひょうじ） --- */
+(function(){
+  const pp = document.getElementById("promisePanel");
+  if(dogName){
+    document.getElementById("promiseWait").textContent =
+      dogName + "は、きょうも あなたを まっていました。";
+  }
+  document.getElementById("promiseOk").addEventListener("click", ()=>{
+    pp.style.display = "none";
+    try{ jingle(); }catch(e){}
+  });
+  document.getElementById("promiseNo").addEventListener("click", ()=>{
+    location.href = "./index.html";
+  });
+})();
 document.body.classList.toggle("hasball", hasBall);
 updateFeedBtn();
 if(!playerName){
