@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>わんこさんぽ 🐕🌸 — いぬと いっしょに のんびり おさんぽ</title>
-<meta name="description" content="女の子と柴犬がちいさな街をのんびりおさんぽする、ほのぼのドット絵ゲーム。動物の住民とおしゃべり、釣り、虫とり、たからさがし。無料・インストール不要・スマホOK。">
-<meta property="og:title" content="わんこさんぽ 🐕🌸">
-<meta property="og:description" content="いぬといっしょに、のんびりおさんぽ。ほのぼのドット絵ゲーム（無料・スマホOK）">
+<title>わんこさんぽ 🐕🌸 — 一度はじめたら、やめられない。ほのぼの恐怖のお世話ゲーム</title>
+<meta name="description" content="見た目は最高にほのぼの。でも一度はじめたら、もうやめられない——あなたの犬は、現実の時間で待っています。ドット絵お世話ゲーム。無料・インストール不要・スマホOK。">
+<meta property="og:title" content="わんこさんぽ 🐕🌸 — ほのぼの恐怖のお世話ゲーム">
+<meta property="og:description" content="見た目はほのぼの。でも一度はじめたら、やめられない。犬は現実の時間であなたを待っています。（※ほのぼのゲームです。本当です）">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://osanpo.bantex.jp/">
 <meta property="og:image" content="https://osanpo.bantex.jp/assets/keyart.png">
@@ -49,6 +49,64 @@
   }
   .catch{
     margin-top:14px; font-size:clamp(15px,3vw,19px); letter-spacing:.2em; color:#b0765a;
+  }
+  .catch-fear{
+    margin-top:8px; font-size:clamp(13px,2.6vw,16px); letter-spacing:.14em; color:#8a7a9e;
+  }
+  .fear-word{
+    color:#6b5087; font-weight:bold;
+    animation:fearshake 3.5s ease-in-out infinite;
+    display:inline-block;
+  }
+  @keyframes fearshake{
+    0%,92%,100%{ transform:translate(0,0) rotate(0); }
+    94%{ transform:translate(-1px,1px) rotate(-1deg); }
+    96%{ transform:translate(1px,-1px) rotate(1deg); }
+    98%{ transform:translate(-1px,0) rotate(0); }
+  }
+
+  /* ───── 恐怖セクション ───── */
+  .fear{
+    max-width:640px; margin:0 auto;
+    background:linear-gradient(165deg, #3a3153 0%, #2c2542 60%, #241e38 100%);
+    border-radius:26px; padding:34px 30px 28px;
+    color:#e8e2f5; position:relative;
+    box-shadow:0 8px 0 rgba(60,48,90,.5), 0 22px 44px rgba(50,40,80,.4);
+  }
+  .fear::before{
+    content:"👻"; position:absolute; top:-16px; right:26px; font-size:30px;
+    animation:float 5s ease-in-out infinite;
+  }
+  .fear h3{
+    font-size:clamp(19px,4vw,24px); letter-spacing:.2em; text-align:center;
+    color:#fff; margin-bottom:6px;
+  }
+  .fear .fear-sub{
+    text-align:center; font-size:12.5px; color:#a99cc7; margin-bottom:20px; letter-spacing:.1em;
+  }
+  .fear ol{ list-style:none; counter-reset:fear; }
+  .fear li{
+    counter-increment:fear;
+    padding:10px 0 10px 40px; position:relative;
+    font-size:14.5px; line-height:1.9;
+    border-bottom:1px dashed rgba(255,255,255,.12);
+  }
+  .fear li::before{
+    content:counter(fear);
+    position:absolute; left:4px; top:12px;
+    width:26px; height:26px; border-radius:50%;
+    background:rgba(255,255,255,.12); color:#d8cdf0;
+    font-weight:bold; font-size:14px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .fear li:last-of-type{ border-bottom:none; }
+  .fear li b{ color:#ffb3c8; }
+  .fear .fear-love{
+    margin-top:20px; text-align:center; font-size:15px; line-height:2;
+    color:#ffe3ee;
+  }
+  .fear .fear-note{
+    margin-top:14px; text-align:center; font-size:12px; color:#8f82b0;
   }
   .cta{
     display:inline-block; margin-top:34px;
@@ -161,6 +219,7 @@
   <span class="float" style="left:78%; top:190px; animation-delay:0.7s;">🌼</span>
   <h1><img class="logo" src="assets/logo.png" alt="わんこさんぽ"></h1>
   <p class="catch">〜 いぬと いっしょに のんびり おさんぽ 〜</p>
+  <p class="catch-fear">そして——いちど はじめたら、なぜか <span class="fear-word">やめられない。</span></p>
   <a class="cta" href="./game.html">▶ いますぐ あそぶ</a>
   <p class="cta-sub">むりょう ・ インストールふよう ・ とうろくふよう</p>
   <p class="badges"><span>📱 スマホOK</span><span>💻 パソコンOK</span><span>💾 じどうセーブ</span></p>
@@ -180,6 +239,25 @@
     <div class="cast"><div class="px" style="background-image:url(sprites/48/tonko.png)"></div><div class="nm">トンこ</div><div class="rl">こぶた</div></div>
     <div class="cast"><div class="px" style="background-image:url(sprites/48/meeko.png)"></div><div class="nm">メエこ</div><div class="rl">ひつじ</div></div>
     <div class="cast"><div class="px" style="background-image:url(sprites/48/noron.png)"></div><div class="nm">ノロん</div><div class="rl">しか</div></div>
+  </div>
+</section>
+
+<section class="wrap">
+  <h2>なぜ、恐怖なのか。<small>WHY SO SCARY ?</small></h2>
+  <div class="fear">
+    <h3>ほのぼのしてるのに、恐怖。</h3>
+    <p class="fear-sub">— この街には、セーブして止まる時間がありません —</p>
+    <ol>
+      <li>この街の時間は、<b>あなたの世界と同じ速さ</b>で流れています。あなたが眠っている間も、わんこのおなかは減っていきます。</li>
+      <li><b>1日</b>会いに行かないと、おなかをすかせて待っています。とぼとぼ歩きます。</li>
+      <li><b>2日</b>会いに行かないと、病気になります。氷のうをのせて、あなたを待っています。</li>
+      <li><b>7日</b>会いに行かないと——<b>……ここには書けません。</b></li>
+      <li>あなたが何日サボったかは、<b>街の住民全員が知っています</b>。会えば、言われます。</li>
+      <li>帰ってきた瞬間、<b>「るすにしていた じかん」</b>が表示されます。ごまかせません。</li>
+      <li>そしてあなたの「おせわ指数」は、<b>全国ランキングでリアルタイム公開</b>されています。</li>
+    </ol>
+    <p class="fear-love">でも、だいじょうぶ。<br>まいにち<b>たった30秒</b>、会いに来てくれるだけで——<br>わんこも街も、ずっとしあわせです。</p>
+    <p class="fear-note">※ ほのぼのゲームです。本当です。</p>
   </div>
 </section>
 
