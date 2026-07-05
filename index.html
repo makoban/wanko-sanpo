@@ -9,7 +9,8 @@
 <meta property="og:description" content="いぬといっしょに、のんびりおさんぽ。ほのぼのドット絵ゲーム（無料・スマホOK）">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://osanpo.bantex.jp/">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="https://osanpo.bantex.jp/assets/keyart.png">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐕</text></svg>">
 <style>
   *{ box-sizing:border-box; margin:0; padding:0; }
@@ -36,6 +37,15 @@
     font-size:clamp(38px,8vw,64px); color:var(--brown);
     letter-spacing:.1em;
     text-shadow:0 4px 0 #fff, 0 7px 0 rgba(255,143,174,.35);
+  }
+  h1 .logo{
+    width:min(520px, 84vw); image-rendering:pixelated;
+    filter:drop-shadow(0 4px 0 rgba(255,255,255,.9)) drop-shadow(0 7px 0 rgba(255,143,174,.35));
+  }
+  .keyart{
+    display:block; margin:36px auto 0;
+    width:min(92vw, 760px); border-radius:24px;
+    box-shadow:0 8px 0 rgba(214,150,170,.4), 0 20px 44px rgba(160,90,120,.3);
   }
   .catch{
     margin-top:14px; font-size:clamp(15px,3vw,19px); letter-spacing:.2em; color:#b0765a;
@@ -131,11 +141,12 @@
   <span class="float" style="left:86%; top:50px;  animation-delay:1.2s;">🐾</span>
   <span class="float" style="left:14%; top:150px; animation-delay:2.1s;">🦋</span>
   <span class="float" style="left:78%; top:190px; animation-delay:0.7s;">🌼</span>
-  <h1>🐕 わんこさんぽ 🌸</h1>
+  <h1><img class="logo" src="assets/logo.png" alt="わんこさんぽ"></h1>
   <p class="catch">〜 いぬと いっしょに のんびり おさんぽ 〜</p>
   <a class="cta" href="./game.html">▶ いますぐ あそぶ</a>
   <p class="cta-sub">むりょう ・ インストールふよう ・ とうろくふよう</p>
   <p class="badges"><span>📱 スマホOK</span><span>💻 パソコンOK</span><span>💾 じどうセーブ</span></p>
+  <img class="keyart" src="assets/keyart.png" alt="わんこさんぽのキービジュアル。桜舞う街を女の子と柴犬がおさんぽし、動物の住民たちが手をふっている">
 </header>
 
 <section class="wrap">

@@ -132,6 +132,10 @@
     width:32px; height:32px; padding:0; border-radius:50%;
   }
   .panel .bells{ font-weight:bold; color:#c98b1e; }
+  .panel .icn{
+    width:26px; height:26px; image-rendering:pixelated;
+    vertical-align:-7px; margin-right:7px;
+  }
   #namePanel{ inset:auto 8%; top:10%; z-index:30; }
   .name-row{ margin:14px 0 4px; }
   .name-row label{ display:block; font-size:13px; margin-bottom:5px; color:#8a5f47; font-weight:bold; }
@@ -174,7 +178,7 @@
 </style>
 </head>
 <body>
-<h1>🐕 わんこさんぽ 🌸</h1>
+<h1><img src="assets/logo.png" alt="わんこさんぽ" style="height:clamp(44px,9vw,72px); image-rendering:pixelated;"></h1>
 <p class="sub">〜 いぬと いっしょに のんびり おさんぽ 〜</p>
 
 <div id="frame">
@@ -505,6 +509,22 @@ function sliceSheet(img, facesLeft){
     sideR: facesLeft ? flipped : raw
   };
 }
+/* --- 街オブジェクトのドット絵（v5）。未読込時はプログラム描画にフォールバック --- */
+const TOWN = {};
+["house-red","house-blue","house-green","house-yellow","tree","tree-sakura",
+ "fountain","stall","bench","lamp","bush","racegate","dock"].forEach(n=>{
+  const im = new Image();
+  im.onload = ()=>{ TOWN[n] = im; };
+  im.src = "sprites/town/" + n + ".png";
+});
+/* --- レースのライバル犬（v5） --- */
+const RIVALS = {};
+["rival_shiro","rival_chobi","rival_gon"].forEach(n=>{
+  const im = new Image();
+  im.onload = ()=>{ RIVALS[n] = sliceSheet(im, false); };
+  im.src = "sprites/48/" + n + ".png";
+});
+
 const SHEET_NAMES = ["girl","dog","moka","mike","kerota","penta","tonko","meeko","mimii","noron"];
 /* 48px版(v3かわいい)を優先、なければ32px版(v1)にフォールバック */
 for(const n of SHEET_NAMES){
@@ -544,6 +564,12 @@ const BUG_DEFS = [
   {name:"ホタル",             price:500, kind:"hotaru", night:true}
 ];
 const bugDef = n => BUG_DEFS.find(b=>b.name===n);
+/* 図鑑・商店用アイコン（v4納品分） */
+const FISH_ICON = {"フナ":"funa","コイ":"koi","キンギョ":"kingyo","ニジマス":"nijimasu","ナマズ":"namazu",
+  "ニシキゴイ":"nishikigoi","きんの さかな":"kin-no-sakana","ながぐつ":"nagagutsu"};
+const BUG_ICON = {"モンシロチョウ":"monshiro","モンキチョウ":"monki","ピンクの ちょうちょ":"pink-chou",
+  "ミツバチ":"mitsubachi","とんぼ":"tonbo","ホタル":"hotaru"};
+const icn = (cat,f)=>`<img class="icn" src="sprites/items/${cat}/${f}.png" alt="" onerror="this.remove()">`;
 
 /* ================= もちもの・セーブ ================= */
 let bells = 0, hasBall = false, bandana = null, petCount = 0;
@@ -626,10 +652,10 @@ for(let y=56;y<61;y++) for(let x=3;x<11;x++) if(ground[y][x]==="g") ground[y][x]
 
 /* おうち（4けん） */
 const houses = [
-  {tx:4,  ty:16, roof:"#e0575f", roofD:"#b8404c"},
-  {tx:11, ty:16, roof:"#5b8dd6", roofD:"#4470b0"},
-  {tx:25, ty:16, roof:"#5fae6e", roofD:"#478a56"},
-  {tx:32, ty:16, roof:"#e8a54e", roofD:"#c48435"}
+  {tx:4,  ty:16, roof:"#e0575f", roofD:"#b8404c", img:"house-red"},
+  {tx:11, ty:16, roof:"#5b8dd6", roofD:"#4470b0", img:"house-blue"},
+  {tx:25, ty:16, roof:"#5fae6e", roofD:"#478a56", img:"house-green"},
+  {tx:32, ty:16, roof:"#e8a54e", roofD:"#c48435", img:"house-yellow"}
 ];
 for(const h of houses){
   for(let y=h.ty+2;y<h.ty+4;y++) for(let x=h.tx;x<h.tx+4;x++) solid[y][x]=true;
@@ -1160,9 +1186,9 @@ const RACE_CLASSES = [
   {name:"チャンピオン", fee:500, prizes:[1500,750,250]}
 ];
 const RIVAL_DEFS = [
-  {name:"シロ",  color:"rgba(245,245,245,0.55)"},
-  {name:"チョビ", color:"rgba(120,88,58,0.5)"},
-  {name:"ゴン",  color:"rgba(95,95,120,0.5)"}
+  {name:"シロ",  key:"rival_shiro", color:"rgba(245,245,245,0.55)"},
+  {name:"チョビ", key:"rival_chobi", color:"rgba(120,88,58,0.5)"},
+  {name:"ゴン",  key:"rival_gon",  color:"rgba(95,95,120,0.5)"}
 ];
 const racePanel = document.getElementById("racePanel");
 function tintCanvas(src, color){
@@ -1208,7 +1234,8 @@ function startRace(cls){
     dogs:[
       {me:true, name:dName(), lane:0, x:0, done:0},
       ...RIVAL_DEFS.map((rd,i)=>({name:rd.name, lane:i+1, x:0, done:0,
-        base: base - 4 + Math.random()*9, wob: Math.random()*6, frames: mkFrames(rd.color)}))
+        base: base - 4 + Math.random()*9, wob: Math.random()*6,
+        frames: RIVALS[rd.key] ? RIVALS[rd.key].sideR : mkFrames(rd.color)}))
     ]};
   uiOpen();
 }
@@ -1284,18 +1311,18 @@ function openShop(){
     <h2>🫛 そらまめ商店</h2>
     <div>もっている ベル：<span class="bells">🔔 ${bells}</span></div>
     <h3>うる</h3>
-    ${sellRow("🍎 りんご", pocket.apple, pocket.apple*100, "apple")}
-    ${sellRow("🐟 さかな ぜんぶ", sumInv(fishInv), fishTotal, "fish")}
-    ${sellRow("🦋 むし ぜんぶ", sumInv(bugInv), bugTotal, "bug")}
-    ${sellRow("🦴 かせき", pocket.fossil, pocket.fossil*500, "fossil")}
+    ${sellRow(icn("fruit","ringo")+"りんご", pocket.apple, pocket.apple*100, "apple")}
+    ${sellRow(icn("fish","funa")+"さかな ぜんぶ", sumInv(fishInv), fishTotal, "fish")}
+    ${sellRow(icn("bug","monshiro")+"むし ぜんぶ", sumInv(bugInv), bugTotal, "bug")}
+    ${sellRow(icn("treasure","kaseki")+"かせき", pocket.fossil, pocket.fossil*500, "fossil")}
     <h3>かう</h3>
     <div class="row"><span class="nm">🌷 はなの タネ<br><small class="muted">いまいる ばしょに はなが さく</small></span>
       <button data-buy="seed" ${bells>=100?"":"disabled"}>100ベル</button></div>
-    <div class="row"><span class="nm">🧣 バンダナ（あか）</span>
+    <div class="row"><span class="nm">${icn("fashion","bandana-aka")}バンダナ（あか）</span>
       <button data-buy="b_red" ${bells>=300?"":"disabled"}>300ベル</button></div>
-    <div class="row"><span class="nm">🧣 バンダナ（そら）</span>
+    <div class="row"><span class="nm">${icn("fashion","bandana-sora")}バンダナ（そら）</span>
       <button data-buy="b_blue" ${bells>=300?"":"disabled"}>300ベル</button></div>
-    <div class="row"><span class="nm">🎾 ボール<br><small class="muted">なにもない ところで スペース／タップで なげる</small></span>
+    <div class="row"><span class="nm">${icn("toy","tennis-ball")}ボール<br><small class="muted">なにもない ところで スペース／タップで なげる</small></span>
       <button data-buy="ball" ${hasBall?"disabled":(bells>=500?"":"disabled")}>${hasBall?"かった！":"500ベル"}</button></div>`;
   shopPanel.style.display = "block";
 }
@@ -1329,12 +1356,12 @@ function toggleBook(){
   uiOpen();
   const fishRows = FISH_DEFS.map(f=>{
     const got = caughtFish.has(f.name);
-    return `<div class="row"><span class="nm">${got?"🐟 "+f.name:"❓ ？？？"}</span>
+    return `<div class="row"><span class="nm">${got? icn("fish",FISH_ICON[f.name])+f.name : "❓ ？？？"}</span>
       <span class="${got?"bells":"muted"}">${got? f.price+"ベル" : "—"}</span></div>`;
   }).join("");
   const bugRows = BUG_DEFS.map(b=>{
     const got = caughtBug.has(b.name);
-    return `<div class="row"><span class="nm">${got?"🦋 "+b.name:"❓ ？？？"}${b.night?' <small class="muted">よる</small>':""}</span>
+    return `<div class="row"><span class="nm">${got? icn("bug",BUG_ICON[b.name])+b.name : "❓ ？？？"}${b.night?' <small class="muted">よる</small>':""}</span>
       <span class="${got?"bells":"muted"}">${got? b.price+"ベル" : "—"}</span></div>`;
   }).join("");
   const total = caughtFish.size + caughtBug.size;
@@ -1725,12 +1752,16 @@ function drawGround(){
       }
       if(v==="d"){
         /* さんばしの いた */
-        ctx.fillStyle = "#b07a4a"; ctx.fillRect(px,py+3,T,18);
-        ctx.fillStyle = "#96633a";
-        ctx.fillRect(px,py+8,T,2); ctx.fillRect(px,py+14,T,2);
-        ctx.fillStyle = "#4a3228";
-        ctx.fillRect(px,py+3,T,2); ctx.fillRect(px,py+20,T,2);
-        if(tx%2===0){ ctx.fillRect(px+3,py+21,3,3); ctx.fillRect(px+18,py+21,3,3); }
+        if(TOWN.dock){
+          ctx.drawImage(TOWN.dock, px, py);
+        }else{
+          ctx.fillStyle = "#b07a4a"; ctx.fillRect(px,py+3,T,18);
+          ctx.fillStyle = "#96633a";
+          ctx.fillRect(px,py+8,T,2); ctx.fillRect(px,py+14,T,2);
+          ctx.fillStyle = "#4a3228";
+          ctx.fillRect(px,py+3,T,2); ctx.fillRect(px,py+20,T,2);
+          if(tx%2===0){ ctx.fillRect(px+3,py+21,3,3); ctx.fillRect(px+18,py+21,3,3); }
+        }
       }
     }
   }
@@ -1740,6 +1771,19 @@ function drawTree(tr){
   const x = tr.tx*T, y = tr.ty*T;
   let s = Math.round(Math.sin(time*0.9 + tr.tx*0.7));
   if(tr.shakeT > 0.2) s = Math.round(Math.sin(time*32)*2);
+  const im = tr.cherry ? TOWN["tree-sakura"] : TOWN.tree;
+  if(im){
+    ctx.drawImage(im, Math.round(x+12+s-im.width/2), Math.round(y+26-im.height));
+    if(tr.fruit && tr.fruitN>0){
+      const offs = [[-11,-31],[1,-40],[7,-26]];
+      for(let i=0;i<tr.fruitN;i++){
+        const ax = x+12+s+offs[i][0], ay = y+offs[i][1];
+        ctx.fillStyle="#e0303a"; ctx.fillRect(ax,ay,5,5);
+        ctx.fillStyle="#ff7a80"; ctx.fillRect(ax,ay,2,2);
+      }
+    }
+    return;
+  }
   ctx.fillStyle = "#4a3228"; ctx.fillRect(x+8,y+5,9,19);
   ctx.fillStyle = "#8a5a3a"; ctx.fillRect(x+9,y+6,7,17);
   const cx = x+12+s, cy = y-5;
@@ -1770,6 +1814,11 @@ function circle(cx,cy,r,col){
 
 function drawHouse(h, nightF){
   const x = h.tx*T, y = h.ty*T;
+  const im = TOWN[h.img];
+  if(im){
+    ctx.drawImage(im, Math.round(x + (96-im.width)/2), Math.round(y + 96 - im.height));
+    return;
+  }
   ctx.fillStyle = "#4a3228"; ctx.fillRect(x+8,y+40,81,53);
   ctx.fillStyle = "#fdf3e3"; ctx.fillRect(x+11,y+43,75,47);
   for(const wx of [x+20, x+65]){
@@ -1795,6 +1844,18 @@ function drawHouse(h, nightF){
 
 function drawFountain(){
   const cx = (FOUNTAIN.tx+2)*T, cy = (FOUNTAIN.ty+2)*T;
+  if(TOWN.fountain){
+    const im = TOWN.fountain;
+    ctx.drawImage(im, Math.round(cx-im.width/2), Math.round(FOUNTAIN.ty*T + 98 - im.height));
+    /* みずの きらめき */
+    for(let i=0;i<3;i++){
+      if(Math.floor(time*3+i*7)%5===i%3){
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        ctx.fillRect(cx-26+((i*23+Math.floor(time*2)*13)%52), FOUNTAIN.ty*T+52+((i*11)%22), 3, 3);
+      }
+    }
+    return;
+  }
   /* そとわ */
   ctx.fillStyle = "#9aa7b5";
   ctx.beginPath(); ctx.ellipse(cx,cy, 45,32,0,0,7); ctx.fill();
@@ -1825,6 +1886,11 @@ function drawFountain(){
 
 function drawStall(){
   const x = STALL.tx*T, y = STALL.ty*T;
+  if(TOWN.stall){
+    const im = TOWN.stall;
+    ctx.drawImage(im, Math.round(x + 24 - im.width/2), Math.round(y + 50 - im.height));
+    return;
+  }
   /* カウンター */
   ctx.fillStyle = "#4a3228"; ctx.fillRect(x-2, y+20, 51, 28);
   ctx.fillStyle = "#b07a4a"; ctx.fillRect(x, y+21, 48, 26);
@@ -1851,6 +1917,10 @@ function drawStall(){
 
 function drawBench(b){
   const x = b.tx*T, y = b.ty*T;
+  if(TOWN.bench){
+    ctx.drawImage(TOWN.bench, Math.round(x + 24 - TOWN.bench.width/2), Math.round(y + 24 - TOWN.bench.height));
+    return;
+  }
   ctx.fillStyle="#4a3228"; ctx.fillRect(x+2,y+5,45,15);
   ctx.fillStyle="#b07a4a"; ctx.fillRect(x+3,y+6,42,5);
   ctx.fillStyle="#96633a"; ctx.fillRect(x+3,y+12,42,6);
@@ -1859,6 +1929,14 @@ function drawBench(b){
 }
 function drawLamp(l, nightF){
   const x = l[0]*T, y = l[1]*T;
+  if(TOWN.lamp){
+    const im = TOWN.lamp;
+    const ly = Math.round(y + 22 - im.height);
+    ctx.drawImage(im, Math.round(x + 12 - im.width/2), ly);
+    ctx.fillStyle = `rgba(255,220,130,${0.18+nightF*0.45})`;
+    ctx.beginPath(); ctx.arc(x+12, ly+9, 9+nightF*13, 0, 7); ctx.fill();
+    return;
+  }
   ctx.fillStyle="#3f6d6a"; ctx.fillRect(x+10,y-6,5,27);
   circle(x+12,y-9,6,"#3f6d6a");
   circle(x+12,y-9,4.5, nightF>0.3 ? "#ffe9a0" : "#ffd97a");
@@ -1867,6 +1945,10 @@ function drawLamp(l, nightF){
 }
 function drawBush(b){
   const x=b[0]*T, y=b[1]*T;
+  if(TOWN.bush){
+    ctx.drawImage(TOWN.bush, Math.round(x + 12 - TOWN.bush.width/2), Math.round(y + 24 - TOWN.bush.height));
+    return;
+  }
   circle(x+12,y+13,11,"#4f9c3d");
   circle(x+10,y+10,9,"#67b34e");
   ctx.fillStyle="#8bcf70"; ctx.fillRect(x+6,y+6,3,3);
@@ -1874,6 +1956,11 @@ function drawBush(b){
 
 function drawRaceGate(){
   const x = RACEGATE.tx*T, y = RACEGATE.ty*T;
+  if(TOWN.racegate){
+    const im = TOWN.racegate;
+    ctx.drawImage(im, Math.round(x + 36 - im.width/2), Math.round(y + 24 - im.height));
+    return;
+  }
   /* ポール */
   ctx.fillStyle = "#4a3228"; ctx.fillRect(x+1, y-32, 8, 56); ctx.fillRect(x+63, y-32, 8, 56);
   ctx.fillStyle = "#8a5a3a"; ctx.fillRect(x+2, y-31, 6, 54); ctx.fillRect(x+64, y-31, 6, 54);
