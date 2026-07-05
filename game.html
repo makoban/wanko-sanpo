@@ -828,20 +828,62 @@ function sfx(type, freq, dur, vol, slideTo){
   o.connect(g); g.connect(ac.destination);
   o.start(t0); o.stop(t0+dur+0.02);
 }
-function bark(){
-  sfx("square", 660, 0.08, 0.12, 460);
-  setTimeout(()=>sfx("square", 520, 0.08, 0.1, 380), 90);
+/* --- ノイズ合成（水しぶき・足音・風切りなどの質感用） --- */
+let noiseBuf = null;
+function noiseSfx(dur, vol, f0, f1, type){
+  if(!ac) return;
+  if(ac.state==="suspended") ac.resume();
+  if(!noiseBuf){
+    noiseBuf = ac.createBuffer(1, ac.sampleRate*0.5, ac.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i] = Math.random()*2-1;
+  }
+  const t0 = ac.currentTime;
+  const src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+  const flt = ac.createBiquadFilter(); flt.type = type || "lowpass";
+  flt.frequency.setValueAtTime(f0, t0);
+  flt.frequency.exponentialRampToValueAtTime(Math.max(40, f1), t0+dur);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0+0.012);
+  g.gain.exponentialRampToValueAtTime(0.001, t0+dur);
+  src.connect(flt); flt.connect(g); g.connect(ac.destination);
+  src.start(t0); src.stop(t0+dur+0.02);
+}
+/* --- SEセット --- */
+function bark(){   /* かわいい「わんっ！」：鼻息ノイズ＋ピッチの落ちる2声 */
+  const p = 0.9 + Math.random()*0.2;
+  sfx("square", 760*p, 0.07, 0.1, 470*p);
+  noiseSfx(0.05, 0.045, 1800, 500);
+  setTimeout(()=>sfx("square", 600*p, 0.09, 0.09, 360*p), 100);
 }
 function voiceBlip(pitch){ sfx("triangle", pitch*(0.85+Math.random()*0.35), 0.055, 0.06); }
-function jingle(){
+function jingle(){        /* ゲット音：キラキラアルペジオ */
   [72,76,81].forEach((m,i)=>setTimeout(()=>sfx("triangle", 440*Math.pow(2,(m-69)/12), 0.18, 0.1), i*90));
+  setTimeout(()=>noiseSfx(0.12, 0.03, 5000, 2500, "highpass"), 260);
 }
 function coinSfx(){
   [88,93].forEach((m,i)=>setTimeout(()=>sfx("triangle", 440*Math.pow(2,(m-69)/12), 0.12, 0.09), i*70));
 }
+function fanfare(){       /* おつかい達成のファンファーレ */
+  [72,76,79,84].forEach((m,i)=>setTimeout(()=>sfx("triangle", 440*Math.pow(2,(m-69)/12), 0.22, 0.1), i*100));
+  setTimeout(coinSfx, 430);
+}
 function popSound(){ sfx("triangle", 880, 0.07, 0.09, 1200); }
-function splash(){ sfx("sine", 320, 0.2, 0.08, 90); }
-function thud(){ sfx("sine", 130, 0.12, 0.12, 60); }
+function splash(){        /* ちゃぽん：水音ノイズ＋沈む音 */
+  sfx("sine", 300, 0.18, 0.06, 90);
+  noiseSfx(0.24, 0.08, 900, 150);
+}
+function thud(){          /* ざくっ：土を掘る */
+  sfx("sine", 110, 0.13, 0.13, 45);
+  noiseSfx(0.12, 0.06, 500, 120);
+}
+function whoosh(){ noiseSfx(0.22, 0.07, 300, 2600, "bandpass"); }   /* ボールを投げる風切り */
+function pom(){ sfx("triangle", 300, 0.09, 0.08, 170); }            /* ボールのバウンド */
+function rustle(){ noiseSfx(0.32, 0.05, 1400, 350); }               /* 木のガサガサ */
+function uiOpen(){ sfx("triangle", 470, 0.08, 0.06, 720); }         /* パネルをひらく */
+function uiClose(){ sfx("triangle", 640, 0.09, 0.05, 380); }        /* パネルをとじる */
+function stepSfx(){ noiseSfx(0.045, 0.018, 480+Math.random()*260, 170); }  /* 足音（ごく小さく） */
 
 /* ================= 当たり判定 ================= */
 function blocked(px,py){
@@ -901,7 +943,7 @@ function startDialog(v){
     v.love = Math.min(5, v.love+1);
     text = `わあ！ ありがとう！！ おれいに ${v.quest.reward}ベル どうぞ♪`;
     v.quest = null;
-    coinSfx();
+    fanfare();
     for(let i=0;i<3;i++) hearts.push({x:v.x+(Math.random()*20-10), y:v.y-24-i*4, vy:-(21+Math.random()*12), life:1.3});
     markSave();
   }else if(v.quest){
@@ -913,6 +955,7 @@ function startDialog(v){
   }
   dialog = { v, text, chars:0 };
   v.state = "idle"; v.wt = 2.5;
+  uiOpen();
 }
 function startFishing(bx,by){
   fishing = { bx, by, t:0, biteT:1.5+Math.random()*2.8, state:"wait", hookT:0 };
@@ -934,7 +977,7 @@ function throwBall(){
   ball.x = player.x + dx*9; ball.y = player.y - 6 + dy*9;
   ball.vx = dx*158; ball.vy = dy*158;
   ball.z = 12; ball.vz = 63;
-  sfx("triangle", 500, 0.12, 0.07, 900);
+  whoosh();
   floatTexts.push({x:player.x, y:player.y-20, text:"それっ！🎾", t:1});
 }
 function digAt(spot){
@@ -1007,7 +1050,7 @@ function tryAction(){
   for(const tr of trees){
     if(!tr.fruit || tr.fruitN<=0) continue;
     const d = dist(player.x,player.y, tr.tx*T+12, tr.ty*T+12);
-    if(d < 39) cands.push({d, f:()=>{ tr.shakeT = 0.6; tr.pendingDrop = 0.3; }});
+    if(d < 39) cands.push({d, f:()=>{ tr.shakeT = 0.6; tr.pendingDrop = 0.3; rustle(); }});
   }
   /* キラキラ（たからさがし） */
   for(const s of digSpots){
@@ -1049,13 +1092,17 @@ function tryAction(){
 /* ================= おみせ・ずかん（DOMパネル） ================= */
 const shopPanel = document.getElementById("shopPanel");
 const bookPanel = document.getElementById("bookPanel");
-function closePanels(){ shopPanel.style.display = "none"; bookPanel.style.display = "none"; }
+function closePanels(){
+  if(shopPanel.style.display==="block" || bookPanel.style.display==="block") uiClose();
+  shopPanel.style.display = "none"; bookPanel.style.display = "none";
+}
 function sellRow(label, count, total, fn){
   return `<div class="row"><span class="nm">${label} × ${count}</span>
     <span class="bells">${total}ベル</span>
     <button ${count? "" : "disabled"} data-sell="${fn}">うる</button></div>`;
 }
 function openShop(){
+  if(shopPanel.style.display !== "block") uiOpen();   /* 再描画時は鳴らさない */
   bookPanel.style.display = "none";
   const fishTotal = FISH_DEFS.reduce((a,f)=>a+(fishInv[f.name]||0)*f.price, 0);
   const bugTotal  = BUG_DEFS.reduce((a,b)=>a+(bugInv[b.name]||0)*b.price, 0);
@@ -1104,8 +1151,9 @@ shopPanel.addEventListener("click", e=>{
   }
 });
 function toggleBook(){
-  if(bookPanel.style.display === "block"){ bookPanel.style.display="none"; return; }
+  if(bookPanel.style.display === "block"){ bookPanel.style.display="none"; uiClose(); return; }
   shopPanel.style.display = "none";
+  uiOpen();
   const fishRows = FISH_DEFS.map(f=>{
     const got = caughtFish.has(f.name);
     return `<div class="row"><span class="nm">${got?"🐟 "+f.name:"❓ ？？？"}</span>
@@ -1175,6 +1223,8 @@ function update(dt){
     player.animT += dt;
     if(player.animT>0.14){ player.animT=0; player.frame^=1; }
     player.idleT = 0;
+    player.stepT = (player.stepT||0) + dt;
+    if(player.stepT > 0.26){ player.stepT = 0; stepSfx(); }
   }else{
     player.frame = 0; player.idleT += dt;
   }
@@ -1195,7 +1245,7 @@ function update(dt){
     fishing.t += dt;
     if(fishing.state==="wait" && fishing.t >= fishing.biteT){
       fishing.state = "bite"; fishing.hookT = 0.8;
-      sfx("sine", 700, 0.1, 0.12, 300);
+      sfx("square", 950, 0.09, 0.1, 520);   /* ！ヒットのビッ */
     }
     if(fishing.state==="bite"){
       fishing.hookT -= dt;
@@ -1210,7 +1260,7 @@ function update(dt){
     ball.vx *= 0.99; ball.vy *= 0.99;
     if(ball.z <= 0){
       ball.z = 0;
-      if(Math.abs(ball.vz) > 33){ ball.vz = -ball.vz*0.45; }
+      if(Math.abs(ball.vz) > 33){ ball.vz = -ball.vz*0.45; pom(); }
       else{
         const tx = Math.floor(ball.x/T), ty = Math.floor(ball.y/T);
         if(tx<1||ty<1||tx>=MW-1||ty>=MH-1 || ground[ty]?.[tx]==="w"){
@@ -2074,6 +2124,7 @@ requestAnimationFrame(loop);
 
 /* デバッグ用フック */
 window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundItems, SPR, bgm,
+  se:{bark, splash, thud, whoosh, pom, rustle, uiOpen, uiClose, fanfare, stepSfx, jingle, coinSfx, popSound},
   digSpots, ball, bugs,
   act:()=>{ actPressed = true; },
   tryAction,
