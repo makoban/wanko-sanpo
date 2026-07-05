@@ -132,6 +132,16 @@
     width:32px; height:32px; padding:0; border-radius:50%;
   }
   .panel .bells{ font-weight:bold; color:#c98b1e; }
+  #namePanel{ inset:auto 8%; top:10%; z-index:30; }
+  .name-row{ margin:14px 0 4px; }
+  .name-row label{ display:block; font-size:13px; margin-bottom:5px; color:#8a5f47; font-weight:bold; }
+  .panel input{
+    width:100%; font-size:16px; padding:10px 12px;
+    border:2px solid #f0cdb8; border-radius:12px;
+    font-family:inherit; color:#6b4a38; background:#fff; outline:none;
+  }
+  .panel input:focus{ border-color:#ff8fae; }
+  .name-ok{ width:100%; margin-top:16px; padding:12px; font-size:15px; }
   .hint-sp{ display:none; }
   @media (pointer:coarse){
     #act{ display:flex; }
@@ -179,6 +189,18 @@
     <button id="ballBtn" title="ボールをなげる">🎾</button>
     <div id="shopPanel" class="panel"></div>
     <div id="bookPanel" class="panel"></div>
+    <div id="namePanel" class="panel">
+      <h2>🐾 なまえを おしえてね</h2>
+      <div class="name-row">
+        <label>👧 あなたの なまえ</label>
+        <input id="nameGirl" maxlength="8" placeholder="はな">
+      </div>
+      <div class="name-row">
+        <label>🐕 わんちゃんの なまえ</label>
+        <input id="nameDog" maxlength="8" placeholder="ぽち">
+      </div>
+      <button id="nameOk" class="name-ok">これで はじめる！</button>
+    </div>
   </div>
 </div>
 
@@ -522,6 +544,9 @@ const bugDef = n => BUG_DEFS.find(b=>b.name===n);
 
 /* ================= もちもの・セーブ ================= */
 let bells = 0, hasBall = false, bandana = null, petCount = 0;
+let playerName = "", dogName = "";
+const pName = ()=> playerName || "あなた";
+const dName = ()=> dogName || "わんちゃん";
 const pocket = { apple:0, fossil:0 };
 const fishInv = {}, bugInv = {};
 const caughtFish = new Set(), caughtBug = new Set();
@@ -533,7 +558,7 @@ function doSave(){
     const love = {};
     for(const v of VILLAGERS) love[v.key] = v.love;
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      bells, hasBall, bandana, petCount,
+      bells, hasBall, bandana, petCount, playerName, dogName,
       apple:pocket.apple, fossil:pocket.fossil,
       fishInv, bugInv,
       caughtFish:[...caughtFish], caughtBug:[...caughtBug],
@@ -548,6 +573,7 @@ function loadSave(){
     if(!d) return;
     bells = d.bells||0; hasBall = !!d.hasBall; bandana = d.bandana||null;
     petCount = d.petCount||0;
+    playerName = d.playerName||""; dogName = d.dogName||"";
     pocket.apple = d.apple||0; pocket.fossil = d.fossil||0;
     Object.assign(fishInv, d.fishInv||{});
     Object.assign(bugInv, d.bugInv||{});
@@ -941,7 +967,7 @@ function startDialog(v){
     questConsume(v.quest);
     bells += v.quest.reward;
     v.love = Math.min(5, v.love+1);
-    text = `わあ！ ありがとう！！ おれいに ${v.quest.reward}ベル どうぞ♪`;
+    text = `わあ！ ${pName()}、ありがとう！！ おれいに ${v.quest.reward}ベル どうぞ♪`;
     v.quest = null;
     fanfare();
     for(let i=0;i<3;i++) hearts.push({x:v.x+(Math.random()*20-10), y:v.y-24-i*4, vy:-(21+Math.random()*12), life:1.3});
@@ -1096,6 +1122,22 @@ function closePanels(){
   if(shopPanel.style.display==="block" || bookPanel.style.display==="block") uiClose();
   shopPanel.style.display = "none"; bookPanel.style.display = "none";
 }
+/* --- なまえ入力パネル --- */
+const namePanel = document.getElementById("namePanel");
+function openNamePanel(){
+  document.getElementById("nameGirl").value = playerName;
+  document.getElementById("nameDog").value = dogName;
+  namePanel.style.display = "block";
+  uiOpen();
+}
+document.getElementById("nameOk").addEventListener("click", ()=>{
+  playerName = (document.getElementById("nameGirl").value.trim() || "はな").slice(0,8);
+  dogName = (document.getElementById("nameDog").value.trim() || "ぽち").slice(0,8);
+  namePanel.style.display = "none";
+  markSave(); doSave();
+  jingle();
+  floatTexts.push({x:player.x, y:player.y-30, text:`${playerName}と${dogName}、おさんぽびより！`, t:2.4});
+});
 function sellRow(label, count, total, fn){
   return `<div class="row"><span class="nm">${label} × ${count}</span>
     <span class="bells">${total}ベル</span>
@@ -1172,13 +1214,17 @@ function toggleBook(){
     <h3>🎣 さかな</h3>${fishRows}
     <h3>🦋 むし</h3>${bugRows}
     <h3>きろく</h3>
+    <div class="row"><span class="nm">👧 ${pName()} ＆ 🐕 ${dName()}</span><button data-rename="1">なまえを かえる</button></div>
     <div class="row"><span class="nm">🔔 ベル</span><span class="bells">${bells}</span></div>
     <div class="row"><span class="nm">💗 なでなで</span><span>${petCount}</span></div>
     <div class="row"><span class="nm">🦴 かせき</span><span>${pocket.fossil}</span></div>`;
   bookPanel.style.display = "block";
 }
 bookBtn.addEventListener("click", toggleBook);
-bookPanel.addEventListener("click", e=>{ if(e.target.dataset.close) closePanels(); });
+bookPanel.addEventListener("click", e=>{
+  if(e.target.dataset.close) closePanels();
+  if(e.target.dataset.rename){ closePanels(); openNamePanel(); }
+});
 
 /* ================= 更新 ================= */
 let time = 0, dayOffset = 0;
@@ -1315,7 +1361,7 @@ function update(dt){
     }else{
       ball.state = "none";
       dog.happyT = 1.5; dog.sayT = 1.2; dog.jumpT = 0.45;
-      floatTexts.push({x:dog.x, y:dog.y-18, text:"もってきた！ えらい！", t:1.6});
+      floatTexts.push({x:dog.x, y:dog.y-18, text:`${dName()}、えらい！`, t:1.6});
       for(let i=0;i<3;i++) hearts.push({x:dog.x+(Math.random()*20-10), y:dog.y-15-i*4, vy:-(21+Math.random()*15), life:1.2});
       bark();
       trail.length = 0; lastTrail = {x:player.x, y:player.y};
@@ -1986,7 +2032,7 @@ function drawUI(){
     const d = dist(player.x,player.y, dog.x,dog.y);
     if(d < 45 && !player.moving && player.idleT > 1.2 && ball.state==="none"){
       const [sx,sy] = W2S(dog.x, dog.y-dogH);
-      bubble(sx, sy, "スペースで なでてね", sc, true);
+      bubble(sx, sy, `${dName()}を なでてね`, sc, true);
     }
   }
   if(fishing && fishing.state==="bite"){
@@ -2110,6 +2156,7 @@ function roundRect(g,x,y,w,h,r,fill){
 /* ================= メインループ ================= */
 loadSave();
 document.body.classList.toggle("hasball", hasBall);
+if(!playerName) setTimeout(openNamePanel, 600);   /* はじめてのときは なまえから */
 let last = performance.now();
 function loop(now){
   const dt = Math.min(0.05, (now-last)/1000);
@@ -2136,7 +2183,8 @@ window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundIte
   addBells:(n)=>{ bells += n; },
   setBall:(v)=>{ hasBall = v; },
   setDayT:(t)=>{ dayOffset = t - (time % DAY_LEN); },
-  openShop, toggleBook };
+  openShop, toggleBook, openNamePanel,
+  get names(){ return {playerName, dogName}; } };
 </script>
 </body>
 </html>
