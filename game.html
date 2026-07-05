@@ -763,6 +763,11 @@ let ac = null, master = null, delayN = null, muted = true;
 let nextNote = 0, noteI = 0;
 const MELODY = [69,72,74,76, 74,72,69,67, 69,72,76,74, 72,74,69,64];
 const muteBtn = document.getElementById("mute");
+/* BGM「きのみのひろば」（ユーザー制作曲）。読み込めない時はオルゴール生成曲にフォールバック */
+const bgm = new Audio("assets/kinomi-no-hiroba.mp3");
+bgm.loop = true; bgm.volume = 0.45; bgm.preload = "auto";
+let bgmFailed = false;
+bgm.addEventListener("error", ()=>{ bgmFailed = true; });
 const bookBtn = document.getElementById("book");
 function initAudio(){
   if(ac) return;
@@ -782,7 +787,13 @@ muteBtn.addEventListener("click", ()=>{
   initAudio();
   muted = !muted;
   muteBtn.textContent = muted ? "🔇" : "🎵";
-  if(master) master.gain.linearRampToValueAtTime(muted?0:0.16, ac.currentTime+0.3);
+  if(muted){
+    bgm.pause();
+  }else if(!bgmFailed){
+    bgm.play().catch(()=>{ bgmFailed = true; });
+  }
+  /* フォールバックのオルゴール音量（mp3が生きていれば常に0） */
+  if(master) master.gain.linearRampToValueAtTime((muted || !bgmFailed) ? 0 : 0.16, ac.currentTime+0.3);
   if(ac && ac.state==="suspended") ac.resume();
 });
 function playNote(midi, t){
@@ -796,7 +807,7 @@ function playNote(midi, t){
   o.start(t); o.stop(t+0.6);
 }
 function tickMusic(){
-  if(!ac || muted) return;
+  if(!ac || muted || !bgmFailed) return;   /* mp3使用中はオルゴールを鳴らさない */
   while(nextNote < ac.currentTime + 0.25){
     playNote(MELODY[noteI % MELODY.length], nextNote);
     if(noteI % 4 === 0) playNote(MELODY[noteI % MELODY.length]-24, nextNote);
@@ -2062,7 +2073,7 @@ applyViewport();
 requestAnimationFrame(loop);
 
 /* デバッグ用フック */
-window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundItems, SPR,
+window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundItems, SPR, bgm,
   digSpots, ball, bugs,
   act:()=>{ actPressed = true; },
   tryAction,
