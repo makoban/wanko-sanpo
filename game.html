@@ -213,42 +213,42 @@
 </head>
 <body>
 <h1><img src="assets/logo.png" alt="わんこさんぽ" style="height:clamp(44px,9vw,72px); image-rendering:pixelated;"></h1>
-<p class="sub">〜 いぬと いっしょに のんびり おさんぽ 〜</p>
+<p class="sub">〜 犬といっしょに のんびりお散歩 〜</p>
 
 <div id="frame">
   <div id="stage">
     <canvas id="game" width="320" height="240"></canvas>
     <canvas id="ui"></canvas>
-    <button id="mute" title="おんがく">🔇</button>
+    <button id="mute" title="音楽">🔇</button>
     <button id="book" title="ずかん">📖</button>
-    <button id="mapBtn" title="まちのちず">🗺</button>
+    <button id="mapBtn" title="町の地図">🗺</button>
     <div id="stickBase"></div>
     <div id="stickKnob"></div>
     <button id="act" title="わんこ" data-label="わんこ">🐾</button>
-    <button id="ballBtn" title="ボールをなげる" data-label="ボール">🎾</button>
+    <button id="ballBtn" title="ボールを投げる" data-label="ボール">🎾</button>
     <button id="feedBtn" title="ごはんをあげる" data-label="ごはん">🍖</button>
     <div id="shopPanel" class="panel"></div>
     <div id="bookPanel" class="panel"></div>
     <div id="namePanel" class="panel">
-      <h2>🐾 なまえを おしえてね</h2>
+      <h2>🐾 名前を教えてね</h2>
       <div class="name-row">
-        <label>👧 あなたの なまえ</label>
+        <label>👧 あなたの名前</label>
         <input id="nameGirl" maxlength="8" placeholder="はな">
       </div>
       <div class="name-row">
-        <label>🐕 わんちゃんの なまえ</label>
+        <label>🐕 わんちゃんの名前</label>
         <input id="nameDog" maxlength="8" placeholder="ぽち">
       </div>
-      <button id="nameOk" class="name-ok">これで はじめる！</button>
+      <button id="nameOk" class="name-ok">これで始める！</button>
     </div>
     <div id="promisePanel" class="panel">
-      <h2>🐾 あそぶまえの おやくそく</h2>
-      <p>わんこと あそぶなら、<b>1にち 30びょう</b>でも いいので、<br>ちゃんと <b>おせわ</b>（🍖 ごはん ・ 🐾 なでなで）を してあげてね。</p>
-      <p class="promise-warn">それが できないなら……<br>おねがいだから、<b>あそばないで</b> あげてください。</p>
-      <p id="promiseWait">わんこは、あなたが くるのを ずっと まっています。</p>
+      <h2>🐾 遊ぶ前のお約束</h2>
+      <p>わんこと遊ぶなら、<b>1日30秒</b>でもいいので、<br>ちゃんと<b>お世話</b>（🍖 ごはん ・ 🐾 なでなで）をしてあげてね。</p>
+      <p class="promise-warn">それができないなら……<br>お願いだから、<b>遊ばないで</b>あげてください。</p>
+      <p id="promiseWait">わんこは、あなたが来るのをずっと待っています。</p>
       <div class="promise-btns">
-        <button id="promiseOk">🐾 やくそくする！ あそぶ</button>
-        <button id="promiseNo">ごめんね、また こんど…</button>
+        <button id="promiseOk">🐾 約束する！ 遊ぶ</button>
+        <button id="promiseNo">ごめんね、また今度…</button>
       </div>
     </div>
     <div id="racePanel" class="panel"></div>
@@ -256,10 +256,10 @@
 </div>
 
 <p class="hint hint-pc">
-  🎮 <b>やじるしキー / WASD</b>：あるく　　🖐 <b>スペース</b>：しらべる（はなす・つる・ほる…）　　🐾 <b>X</b>：わんこ（なでる・よぶ）　　🍖 <b>F</b>：ごはん　　🎾 <b>Z</b>：ボール　　🗺 <b>M</b>：ちず　　📖 <b>B</b>：ずかん
+  🎮 <b>矢印キー / WASD</b>：歩く　　🖐 <b>スペース</b>：調べる（話す・つる・ほる…）　　🐾 <b>X</b>：わんこ（なでる・呼ぶ）　　🍖 <b>F</b>：ごはん　　🎾 <b>Z</b>：ボール　　🗺 <b>M</b>：地図　　📖 <b>B</b>：ずかん
 </p>
 <p class="hint hint-sp">
-  📱 <b>ゆびで ドラッグ</b>：あるく　　🐾 <b>タップ</b>：はなす ・ なでる ・ とる ・ ほる　　🎾ボタン：ボール
+  📱 <b>指でドラッグ</b>：歩く　　🐾 <b>タップ</b>：話す ・ なでる ・ 取る ・ ほる　　🎾ボタン：ボール
 </p>
 
 <script>
@@ -678,23 +678,23 @@ const FISH_DEFS = [
   {name:"ニジマス",   price:650,  w:12},
   {name:"ナマズ",     price:800,  w:10},
   {name:"ニシキゴイ", price:1800, w:6},
-  {name:"きんの さかな", price:4000, w:3},
-  {name:"ながぐつ",   price:10,   w:4}
+  {name:"金の魚", price:4000, w:3},
+  {name:"長ぐつ",   price:10,   w:4}
 ];
 const BUG_DEFS = [
   {name:"モンシロチョウ",     price:80,  kind:"chou",   col:"#ffffff"},
   {name:"モンキチョウ",       price:90,  kind:"chou",   col:"#ffe066"},
-  {name:"ピンクの ちょうちょ", price:150, kind:"chou",   col:"#ffb3d9"},
+  {name:"ピンクのチョウ", price:150, kind:"chou",   col:"#ffb3d9"},
   {name:"ミツバチ",           price:200, kind:"bee"},
-  {name:"とんぼ",             price:250, kind:"tonbo"},
+  {name:"トンボ",             price:250, kind:"tonbo"},
   {name:"ホタル",             price:500, kind:"hotaru", night:true}
 ];
 const bugDef = n => BUG_DEFS.find(b=>b.name===n);
 /* 図鑑・商店用アイコン（v4納品分） */
 const FISH_ICON = {"フナ":"funa","コイ":"koi","キンギョ":"kingyo","ニジマス":"nijimasu","ナマズ":"namazu",
-  "ニシキゴイ":"nishikigoi","きんの さかな":"kin-no-sakana","ながぐつ":"nagagutsu"};
-const BUG_ICON = {"モンシロチョウ":"monshiro","モンキチョウ":"monki","ピンクの ちょうちょ":"pink-chou",
-  "ミツバチ":"mitsubachi","とんぼ":"tonbo","ホタル":"hotaru"};
+  "ニシキゴイ":"nishikigoi","金の魚":"kin-no-sakana","長ぐつ":"nagagutsu"};
+const BUG_ICON = {"モンシロチョウ":"monshiro","モンキチョウ":"monki","ピンクのチョウ":"pink-chou",
+  "ミツバチ":"mitsubachi","トンボ":"tonbo","ホタル":"hotaru"};
 const icn = (cat,f)=>`<img class="icn" src="sprites/items/${cat}/${f}.png" alt="" onerror="this.remove()">`;
 
 /* ================= もちもの・セーブ ================= */
@@ -734,9 +734,9 @@ const poops = [];
 let poopTimer = 0, feedAnimT = 0, dogIdleT = 0, farewell = null;
 let lastAbsenceH = 0, pendingFarewell = false;
 function fmtAbsence(h){
-  if(h >= 24) return `${Math.floor(h/24)}にちと ${Math.floor(h%24)}じかん`;
-  if(h >= 1) return `${Math.floor(h)}じかん`;
-  return "すこしのあいだ";
+  if(h >= 24) return `${Math.floor(h/24)}日と${Math.floor(h%24)}時間`;
+  if(h >= 1) return `${Math.floor(h)}時間`;
+  return "少しの間";
 }
 /* るすの じかんに おうじて じょうきょうが わるくなる
    （まいにち30びょう おせわすれば だいじょうぶ。1にちで はらぺこ、2にちで びょうき、7にちで…） */
@@ -805,6 +805,16 @@ function loadSave(){
     Object.assign(bugInv, d.bugInv||{});
     (d.caughtFish||[]).forEach(f=>caughtFish.add(f));
     (d.caughtBug||[]).forEach(b=>caughtBug.add(b));
+    /* 旧表記のセーブを新表記へ移行 */
+    {
+      const REN = {"きんの さかな":"金の魚","ながぐつ":"長ぐつ","ピンクの ちょうちょ":"ピンクのチョウ","とんぼ":"トンボ"};
+      for(const inv of [fishInv, bugInv]) for(const k of Object.keys(inv)){
+        if(REN[k]){ inv[REN[k]] = (inv[REN[k]]||0) + inv[k]; delete inv[k]; }
+      }
+      for(const set of [caughtFish, caughtBug]) for(const k of [...set]){
+        if(REN[k]){ set.delete(k); set.add(REN[k]); }
+      }
+    }
     if(d.love) for(const v of VILLAGERS) if(d.love[v.key]!=null) v.love = d.love[v.key];
   }catch(e){}
 }
@@ -930,44 +940,44 @@ const VILLAGERS = [
   { name:"モカ", key:"moka", tag:"#c98b4e",
     img: makeVillager(HEAD_BEAR, {s:"#b48a5a", m:"#e0c39a", T:"#e0575f", t:"#f2888e"}),
     hx:16.5*T, hy:25.5*T, pitch:300,
-    lines:["やあ！ きょうも いい てんき だべあ〜","ふんすいの おと、おちつくべあ…","はちみつトースト たべたいべあ… じゅるり"] },
+    lines:["やあ！ 今日もいい天気だべあ〜","ふんすいの音、落ち着くべあ…","はちみつトースト食べたいべあ… じゅるり"] },
   { name:"ミケ", key:"mike", tag:"#e8a24e",
     img: makeVillager(HEAD_CAT, {s:"#f2b264", T:"#4f9c3d", t:"#6fbf5b"}),
     hx:23*T, hy:26*T, pitch:680,
-    lines:["ひなたで ひるね するのが すきなの にゃ〜","おさかな つったら みせて ほしいにゃん！","この まち、ひろくなったよね〜 にゃ"] },
+    lines:["ひなたでお昼ねするのが好きなのにゃ〜","お魚をつったら見せてほしいにゃん！","この町、広くなったよね〜にゃ"] },
   { name:"ケロた", key:"kerota", tag:"#5daf3f",
     img: makeVillager(HEAD_FROG, {s:"#8fd06c", T:"#ffd166", t:"#ffe08c"}),
     hx:15.5*T, hy:50.5*T, pitch:460,
-    lines:["さんばしから つりが できるケロ！","みずうみは ひろくて きもちいい ケロ〜","よるに なると ホタルが とぶ ケロ！"] },
+    lines:["さんばしで、つりができるケロ！","湖は広くて気持ちいいケロ〜","夜になるとホタルが飛ぶケロ！"] },
   { name:"ペンタ", key:"penta", tag:"#5b8dd6",
     img: makeVillager(HEAD_PENGUIN, {s:"#6b9bd0", n:"#f0a050", T:"#e0575f", t:"#ffffff"}),
     hx:25*T, hy:60.3*T, pitch:560,
-    lines:["みずうみの みなみがわは しずかで いいペン","ニシキゴイ つれたら みせてペン！","いつか うみも みてみたい ペン〜"] },
+    lines:["湖の南側は静かでいいペン","ニシキゴイがつれたら見せてペン！","いつか海も見てみたいペン〜"] },
   { name:"トンこ", key:"tonko", tag:"#e88ba8",
     img: makeVillager(HEAD_PIG, {s:"#f5b8c9", m:"#fac9d6", T:"#5b8dd6", t:"#7fabe0"}),
     hx:28.5*T, hy:41.5*T, pitch:620,
-    lines:["おはなばたけの におい、しあわせ ぶひ〜","こうえんの おはな、そだてたの ぶひ！","キラキラの ばしょ、ほると いいこと あるぶひ"] },
+    lines:["お花畑のにおい、幸せぶひ〜","公園のお花、育てたのぶひ！","キラキラの場所、ほるといい事あるぶひ"] },
   { name:"メエこ", key:"meeko", tag:"#b48ee0",
     img: makeVillager(HEAD_SHEEP, {s:"#f7f0dd", m:"#e8c39a", T:"#c58bf2", t:"#d8aef7"}),
     hx:26.8*T, hy:27*T, pitch:520,
-    lines:["そらまめ商店で おかいもの した？ メェ","ベンチで ひなたぼっこ さいこう メェ","あたらしい バンダナ、わんちゃんに にあいそう メェ！"] },
+    lines:["そらまめ商店でお買い物した？ メェ","ベンチでひなたぼっこ、最高メェ","新しいバンダナ、わんちゃんに似合いそうメェ！"] },
   { name:"ミミィ", key:"mimii", tag:"#f088a8",
     img: makeVillager(HEAD_RABBIT, {s:"#ffffff", T:"#ff8fae", t:"#ffc2d6"}),
     hx:10.5*T, hy:38.5*T, pitch:760,
-    lines:["この 花だん、まいにち みずやり してるの！","ぴょんぴょん きょうそう しない？","ちょうちょが いっぱいで うれしいな〜"] },
+    lines:["この花だん、毎日水やりしてるの！","ぴょんぴょん競走しない？","チョウチョがいっぱいでうれしいな〜"] },
   { name:"ノロん", key:"noron", tag:"#a8763e",
     img: makeVillager(HEAD_DEER, {s:"#d9a066", m:"#f2d8b0", k:"#8a5a3a", T:"#3f6d6a", t:"#5f8d8a"}),
     hx:14*T, hy:7.5*T, pitch:400,
-    lines:["みずうみの にしに ひみつの はなばたけが あるんだ","もりは しずかで おちつくなあ","つの、ちょっと じまんなんだ"] },
+    lines:["湖の西に、ひみつのお花畑があるんだ","森は静かで落ち着くなあ","ツノ、ちょっとじまんなんだ"] },
   /* v7：きらきらの まちにだけ あそびにくる おきゃくさま */
   { name:"ポッポさん", key:"poppo", tag:"#8a93a3", tourist:true,
     img: makeVillager(HEAD_BEAR, {s:"#9aa3b0", m:"#c3ccd8", T:"#b8646a", t:"#d08a90"}),
     hx:21.5*T, hy:22.5*T, pitch:360,
-    lines:["たびの とちゅうに よってみたんだ。にぎやかで いい まちだねえ","この まちの うわさ、となりまちまで きこえてるよ！","おはなの かおりが する まちは、いい まちなんだ"] },
+    lines:["旅のとちゅうに寄ってみたんだ。にぎやかでいい町だねえ","この町のうわさ、となり町まで聞こえてるよ！","お花のかおりがする町は、いい町なんだ"] },
   { name:"ビーちゃん", key:"beechan", tag:"#e8b93e", tourist:true,
     img: makeVillager(HEAD_BEAR, {s:"#ffd95e", m:"#fff0b8", T:"#8a5a3a", t:"#b58a5a"}),
     hx:17.5*T, hy:27.5*T, pitch:700,
-    lines:["はちみつ いかが〜？ …なんてね、きょうは あそびに きたの♪","おはなが いっぱいだから ミツバチも うれしいの","げんきな まちには あまーい かおりが するのよ〜"] }
+    lines:["はちみつ、いかが〜？ …なんてね、今日は遊びに来たの♪","お花がいっぱいだから、ミツバチもうれしいの","元気な町には、あまーいかおりがするのよ〜"] }
 ];
 for(const v of VILLAGERS){
   v.x = v.hx; v.y = v.hy;
@@ -1017,7 +1027,7 @@ function spawnBug(name){
 function manageBugs(night){
   const want = night
     ? ["ホタル","ホタル","ホタル","ホタル"]
-    : ["モンシロチョウ","モンキチョウ","ピンクの ちょうちょ","ミツバチ","とんぼ","モンシロチョウ"];
+    : ["モンシロチョウ","モンキチョウ","ピンクのチョウ","ミツバチ","トンボ","モンシロチョウ"];
   /* 時間帯に あわない むしは かえる */
   for(let i=bugs.length-1;i>=0;i--){
     const isN = bugs[i].kind==="hotaru";
@@ -1181,9 +1191,9 @@ function blocked(px,py){
 
 /* ================= クエスト ================= */
 const QUEST_TYPES = [
-  {type:"apple", n:3, reward:400, ask:n=>`りんごを ${n}こ もってきて くれない？`},
-  {type:"fish",  n:1, reward:500, ask:n=>`おさかなが たべたいなあ… ${n}ぴき つってきて！`},
-  {type:"bug",   n:1, reward:450, ask:n=>`むしが だいすき！ ${n}ぴき つかまえてきて〜`}
+  {type:"apple", n:3, reward:400, ask:n=>`リンゴを${n}個持ってきてくれない？`},
+  {type:"fish",  n:1, reward:500, ask:n=>`お魚が食べたいなあ… ${n}ぴきつってきて！`},
+  {type:"bug",   n:1, reward:450, ask:n=>`虫が大好き！ ${n}ぴきつかまえてきて〜`}
 ];
 function activeQuests(){ return VILLAGERS.filter(v=>v.quest).length; }
 function tryAssignQuest(){
@@ -1224,23 +1234,23 @@ function startDialog(v){
     questConsume(v.quest);
     bells += v.quest.reward;
     v.love = Math.min(5, v.love+1);
-    text = `わあ！ ${pName()}、ありがとう！！ おれいに ${v.quest.reward}ベル どうぞ♪`;
+    text = `わあ！ ${pName()}、ありがとう！！ お礼に${v.quest.reward}ベルどうぞ♪`;
     v.quest = null;
     fanfare();
     addCare(10);
     for(let i=0;i<3;i++) hearts.push({x:v.x+(Math.random()*20-10), y:v.y-24-i*4, vy:-(21+Math.random()*12), life:1.3});
     markSave();
   }else if(care.sick){
-    text = medCount>0 ? `${dName()}の ぐあいが わるいよ！ はやく 🐾で おくすりを あげて！`
-                      : `${dName()}が びょうき みたい…。商店で おくすりを かってあげて！`;
+    text = medCount>0 ? `${dName()}の具合が悪いよ！ 早く🐾でお薬をあげて！`
+                      : `${dName()}が病気みたい…。商店でお薬を買ってあげて！`;
   }else if(care.hunger < 25){
-    text = `ねえ、${dName()}が おなかを すかせてるよ…。ごはんを あげてね`;
+    text = `ねえ、${dName()}がおなかをすかせてるよ…。ごはんをあげてね`;
   }else if(poops.length >= 2){
-    text = `おさんぽみちが よごれてるよ〜。${dName()}のために きれいに しようね`;
+    text = `お散歩道がよごれてるよ〜。${dName()}のためにきれいにしようね`;
   }else if(lastAbsenceH >= 24 && !v.saidOkaeri){
     v.saidOkaeri = true;
-    text = `おかえり ${pName()}！ ${dName()}、${fmtAbsence(lastAbsenceH)}も ずっと まってたんだよ`
-         + (spirit < 25 ? "。…まちも すっかり どんより しちゃった" : "");
+    text = `おかえり ${pName()}！ ${dName()}、${fmtAbsence(lastAbsenceH)}もずっと待ってたんだよ`
+         + (spirit < 25 ? "。…町もすっかりどんよりしちゃった" : "");
   }else if(v.quest){
     text = v.quest.ask;
   }else{
@@ -1248,15 +1258,15 @@ function startDialog(v){
     const gT = spiritTier();
     const warmth = Math.random() < (v.love >= 2 ? 0.55 : 0.35);
     if(!v.tourist && gT === 0 && Math.random() < 0.55){
-      const cold = ["…ひさしぶりだね。","さいきん、まちが しずかで さみしいよ…",
-        `${dName()}を だいじに してあげてよ`,"おはなたち、みずを ほしがってたよ…",
-        "ふんすいも とまっちゃったね。…どうしてかな"];
+      const cold = ["…久しぶりだね。","最近、町が静かでさみしいよ…",
+        `${dName()}を大事にしてあげてよ`,"お花たち、水をほしがってたよ…",
+        "ふんすいも止まっちゃったね。…どうしてかな"];
       text = cold[Math.floor(Math.random()*cold.length)];
     }else if(!v.tourist && gT === 3 && warmth){
-      const warm = [`${pName()}が いると まちが あかるいね！`,
-        "まいにち ありがとう♪ おはなも うれしそう！",
-        `${dName()}、いつも たのしそうだね〜`,
-        "きょうも きらきらの いちにちだね！","おきゃくさままで あそびに きてるよ！ すごいね！"];
+      const warm = [`${pName()}がいると町が明るいね！`,
+        "毎日ありがとう♪ お花もうれしそう！",
+        `${dName()}、いつも楽しそうだね〜`,
+        "今日もきらきらの一日だね！","お客さままで遊びに来てるよ！ すごいね！"];
       text = warm[Math.floor(Math.random()*warm.length)];
     }else{
       text = v.lines[v.lineI % v.lines.length];
@@ -1298,10 +1308,10 @@ function digAt(spot){
   }
   const r = Math.random();
   let msg;
-  if(r < 0.5){ const b = 30+Math.floor(Math.random()*90); bells += b; msg = `🔔 ${b}ベル みつけた！`; coinSfx(); }
-  else if(r < 0.8){ const b = 150+Math.floor(Math.random()*250); bells += b; msg = `🔔 ${b}ベル ほりあてた！`; coinSfx(); }
-  else if(r < 0.93){ pocket.fossil++; msg = "🦴 かせきを ほりあてた！"; jingle(); }
-  else { bells += 2000; msg = "✨ きんの ホネ！！ 2000ベル！"; jingle(); }
+  if(r < 0.5){ const b = 30+Math.floor(Math.random()*90); bells += b; msg = `🔔 ${b}ベル見つけた！`; coinSfx(); }
+  else if(r < 0.8){ const b = 150+Math.floor(Math.random()*250); bells += b; msg = `🔔 ${b}ベルほり当てた！`; coinSfx(); }
+  else if(r < 0.93){ pocket.fossil++; msg = "🦴 化石をほり当てた！"; jingle(); }
+  else { bells += 2000; msg = "✨ 金のホネ！！ 2000ベル！"; jingle(); }
   popup = { text: msg, t:2.4 };
   digSpots.splice(digSpots.indexOf(spot),1);
   digRespawnT = 8+Math.random()*10;
@@ -1314,14 +1324,14 @@ function tryAction(){
     return;
   }
   if(fishing){
-    if(fishing.state === "wait"){ endFishing("…なにも いないみたい"); }
+    if(fishing.state === "wait"){ endFishing("…何もいないみたい"); }
     else{
       const f = pickWeightedFish();
       fishInv[f.name] = (fishInv[f.name]||0)+1;
       const isNew = !caughtFish.has(f.name);
       caughtFish.add(f.name);
-      popup = { text: (f.name==="ながぐつ" ? "👢 ながぐつを つりあげた！ …なんで？"
-                                          : `🐟 ${f.name}を つりあげた！`) + (isNew?"　✨ずかんに のった！":""), t:2.6 };
+      popup = { text: (f.name==="長ぐつ" ? "👢 長ぐつをつり上げた！ …なんで？"
+                                          : `🐟 ${f.name}をつり上げた！`) + (isNew?"　✨ずかんにのった！":""), t:2.6 };
       jingle();
       fishing = null;
       addCare(1); markSave();
@@ -1353,7 +1363,7 @@ function tryAction(){
         bugInv[b.name] = (bugInv[b.name]||0)+1;
         const isNew = !caughtBug.has(b.name);
         caughtBug.add(b.name);
-        popup = { text:`🦋 ${b.name}を つかまえた！`+(isNew?"　✨ずかんに のった！":""), t:2.4 };
+        popup = { text:`🦋 ${b.name}をつかまえた！`+(isNew?"　✨ずかんにのった！":""), t:2.4 };
         jingle();
         bugs.splice(bugs.indexOf(b),1);
         addCare(1); markSave();
@@ -1380,7 +1390,7 @@ function tryAction(){
     if(d < 33) cands.push({d:d*0.85, f:()=>{
       poops.splice(poops.indexOf(pp), 1);
       popSound();
-      floatTexts.push({x:pp.x, y:pp.y-12, text:"きれいに した！✨", t:1.4});
+      floatTexts.push({x:pp.x, y:pp.y-12, text:"きれいにした！✨", t:1.4});
       care.growth += 2; checkGrowth(); addCare(3); markSave();
     }});
   }
@@ -1414,7 +1424,7 @@ function dogAction(){
     care.sick = false; care.sickT = 0; care.hungryT = 0; care.poopT = 0;
     care.hunger = Math.max(care.hunger, 55);
     jingle();
-    floatTexts.push({x:dog.x, y:dog.y-28, text:`${dName()}は げんきに なった！`, t:2.2});
+    floatTexts.push({x:dog.x, y:dog.y-28, text:`${dName()}は元気になった！`, t:2.2});
     addCare(5);
     dog.happyT = 2; dog.jumpT = 0.45;
     for(let i=0;i<3;i++) hearts.push({x:dog.x+(Math.random()*20-10), y:dog.y-15-i*4, vy:-(21+Math.random()*15), life:1.3});
@@ -1457,13 +1467,13 @@ document.getElementById("nameOk").addEventListener("click", ()=>{
   /* はじめてのおさんぽセット（初回のみ） */
   if(!nameOkDone && foodStock === 0 && bells < 100){
     foodStock += 5; bells += 300; updateFeedBtn();
-    setTimeout(()=>{ popup = { text:"🎁 はじめてセット：ごはん5しょく と 300ベル！", t:4.5 }; }, 1500);
+    setTimeout(()=>{ popup = { text:"🎁 はじめてセット：ごはん5食と300ベル！", t:4.5 }; }, 1500);
   }
   nameOkDone = true;
   netDirty = true; netTimer = 2;
   markSave(); doSave();
   jingle();
-  floatTexts.push({x:player.x, y:player.y-30, text:`${playerName}と${dogName}、おさんぽびより！`, t:2.4});
+  floatTexts.push({x:player.x, y:player.y-30, text:`${playerName}と${dogName}、お散歩びより！`, t:2.4});
 });
 
 /* ================= ドッグレースじょう ================= */
@@ -1493,15 +1503,15 @@ function openRaceGate(){
   shopPanel.style.display = "none"; bookPanel.style.display = "none";
   const rows = RACE_CLASSES.map((c,i)=>`
     <div class="row"><span class="nm">${["🐣","🏃","👑"][i]} ${c.name}<br>
-      <small class="muted">1い しょうきん ${c.prizes[0]}ベル</small></span>
-      <button data-race="${i}" ${bells>=c.fee?"":"disabled"}>${c.fee}ベルで はしる</button></div>`).join("");
+      <small class="muted">1位賞金 ${c.prizes[0]}ベル</small></span>
+      <button data-race="${i}" ${bells>=c.fee?"":"disabled"}>${c.fee}ベルで走る</button></div>`).join("");
   racePanel.innerHTML = `
     <button class="close" data-close="1">✕</button>
-    <h2>🏁 ドッグレースじょう</h2>
-    <div>${dName()}と いっしょに 1いを めざそう！<br>
-      <small class="muted">レースちゅうは スペース／タップの れんだで おうえん。おしすぎると いきぎれ しちゃうよ！</small></div>
-    <div style="margin-top:8px;">もっている ベル：<span class="bells">🔔 ${bells}</span></div>
-    <h3>クラスを えらぶ</h3>
+    <h2>🏁 ドッグレース場</h2>
+    <div>${dName()}といっしょに1位を目指そう！<br>
+      <small class="muted">レース中はスペース／タップの連打でおうえん。おしすぎると、いき切れしちゃうよ！</small></div>
+    <div style="margin-top:8px;">持っているベル：<span class="bells">🔔 ${bells}</span></div>
+    <h3>クラスを選ぶ</h3>
     ${rows}`;
   racePanel.style.display = "block";
   uiOpen();
@@ -1512,7 +1522,7 @@ racePanel.addEventListener("click", e=>{
 });
 function startRace(cls){
   const C = RACE_CLASSES[cls];
-  if(bells < C.fee){ floatTexts.push({x:player.x, y:player.y-20, text:"ベルが たりない…", t:1.5}); return; }
+  if(bells < C.fee){ floatTexts.push({x:player.x, y:player.y-20, text:"ベルが足りない…", t:1.5}); return; }
   bells -= C.fee; markSave();
   closePanels();
   const base = [93,107,128][cls];
@@ -1589,7 +1599,7 @@ function updateRace(dt){
 function sellRow(label, count, total, fn){
   return `<div class="row"><span class="nm">${label} × ${count}</span>
     <span class="bells">${total}ベル</span>
-    <button ${count? "" : "disabled"} data-sell="${fn}">うる</button></div>`;
+    <button ${count? "" : "disabled"} data-sell="${fn}">売る</button></div>`;
 }
 function openShop(){
   if(shopPanel.style.display !== "block") uiOpen();   /* 再描画時は鳴らさない */
@@ -1599,24 +1609,24 @@ function openShop(){
   shopPanel.innerHTML = `
     <button class="close" data-close="1">✕</button>
     <h2>🫛 そらまめ商店</h2>
-    <div>もっている ベル：<span class="bells">🔔 ${bells}</span></div>
-    <h3>うる</h3>
-    ${sellRow(icn("fruit","ringo")+"りんご", pocket.apple, pocket.apple*100, "apple")}
-    ${sellRow(icn("fish","funa")+"さかな ぜんぶ", sumInv(fishInv), fishTotal, "fish")}
-    ${sellRow(icn("bug","monshiro")+"むし ぜんぶ", sumInv(bugInv), bugTotal, "bug")}
-    ${sellRow(icn("treasure","kaseki")+"かせき", pocket.fossil, pocket.fossil*500, "fossil")}
-    <h3>かう</h3>
-    <div class="row"><span class="nm">🌷 はなの タネ<br><small class="muted">いまいる ばしょに はなが さく</small></span>
+    <div>持っているベル：<span class="bells">🔔 ${bells}</span></div>
+    <h3>売る</h3>
+    ${sellRow(icn("fruit","ringo")+"リンゴ", pocket.apple, pocket.apple*100, "apple")}
+    ${sellRow(icn("fish","funa")+"魚 全部", sumInv(fishInv), fishTotal, "fish")}
+    ${sellRow(icn("bug","monshiro")+"虫 全部", sumInv(bugInv), bugTotal, "bug")}
+    ${sellRow(icn("treasure","kaseki")+"化石", pocket.fossil, pocket.fossil*500, "fossil")}
+    <h3>買う</h3>
+    <div class="row"><span class="nm">🌷 花のタネ<br><small class="muted">今いる場所に花がさく</small></span>
       <button data-buy="seed" ${bells>=100?"":"disabled"}>100ベル</button></div>
-    <div class="row"><span class="nm">${icn("fashion","bandana-aka")}バンダナ（あか）</span>
+    <div class="row"><span class="nm">${icn("fashion","bandana-aka")}バンダナ（赤）</span>
       <button data-buy="b_red" ${bells>=300?"":"disabled"}>300ベル</button></div>
-    <div class="row"><span class="nm">${icn("fashion","bandana-sora")}バンダナ（そら）</span>
+    <div class="row"><span class="nm">${icn("fashion","bandana-sora")}バンダナ（空色）</span>
       <button data-buy="b_blue" ${bells>=300?"":"disabled"}>300ベル</button></div>
-    <div class="row"><span class="nm">${icn("toy","tennis-ball")}ボール<br><small class="muted">なにもない ところで スペース／タップで なげる</small></span>
-      <button data-buy="ball" ${hasBall?"disabled":(bells>=500?"":"disabled")}>${hasBall?"かった！":"500ベル"}</button></div>
-    <div class="row"><span class="nm">${icn("food","dogfood")}ドッグフード（10しょく）<br><small class="muted">🍖ボタン／Fキーで ごはんを あげよう</small></span>
+    <div class="row"><span class="nm">${icn("toy","tennis-ball")}ボール<br><small class="muted">何もない所でスペース／タップで投げる</small></span>
+      <button data-buy="ball" ${hasBall?"disabled":(bells>=500?"":"disabled")}>${hasBall?"買った！":"500ベル"}</button></div>
+    <div class="row"><span class="nm">${icn("food","dogfood")}ドッグフード（10食）<br><small class="muted">🍖ボタン／Fキーでごはんをあげよう</small></span>
       <button data-buy="food" ${bells>=300?"":"disabled"}>300ベル</button></div>
-    <div class="row"><span class="nm">${icn("care","kusuri")}おくすり<br><small class="muted">びょうきのとき 🐾ボタンで あげる</small></span>
+    <div class="row"><span class="nm">${icn("care","kusuri")}お薬<br><small class="muted">病気のとき🐾ボタンであげる</small></span>
       <button data-buy="med" ${bells>=200?"":"disabled"}>200ベル</button></div>`;
   shopPanel.style.display = "block";
 }
@@ -1635,15 +1645,15 @@ shopPanel.addEventListener("click", e=>{
     const k = t.dataset.buy;
     if(k==="seed" && bells>=100){
       const tx = Math.floor(player.x/T), ty = Math.floor(player.y/T);
-      if(ground[ty][tx]==="g"){ ground[ty][tx]="f"; bells-=100; popSound(); floatTexts.push({x:player.x,y:player.y-16,text:"🌷 はなが さいた！",t:1.6}); }
-      else floatTexts.push({x:player.x,y:player.y-16,text:"ここには うえられない…",t:1.4});
+      if(ground[ty][tx]==="g"){ ground[ty][tx]="f"; bells-=100; popSound(); floatTexts.push({x:player.x,y:player.y-16,text:"🌷 花がさいた！",t:1.6}); }
+      else floatTexts.push({x:player.x,y:player.y-16,text:"ここには植えられない…",t:1.4});
     }
     if(k==="b_red" && bells>=300){ bells-=300; bandana="#e0575f"; popSound(); }
     if(k==="b_blue" && bells>=300){ bells-=300; bandana="#5b8dd6"; popSound(); }
     if(k==="ball" && !hasBall && bells>=500){
       bells-=500; hasBall=true; jingle();
       document.body.classList.add("hasball");
-      popup = { text:"🎾ボタンで ボールを なげよう！ むいている ほうに とぶよ", t:4.5 };
+      popup = { text:"🎾ボタンでボールを投げよう！ 向いている方に飛ぶよ", t:4.5 };
     }
     if(k==="food" && bells>=300){ bells-=300; foodStock+=10; popSound(); updateFeedBtn(); }
     if(k==="med" && bells>=200){ bells-=200; medCount++; popSound(); }
@@ -1662,25 +1672,25 @@ function toggleBook(){
   }).join("");
   const bugRows = BUG_DEFS.map(b=>{
     const got = caughtBug.has(b.name);
-    return `<div class="row"><span class="nm">${got? icn("bug",BUG_ICON[b.name])+b.name : "❓ ？？？"}${b.night?' <small class="muted">よる</small>':""}</span>
+    return `<div class="row"><span class="nm">${got? icn("bug",BUG_ICON[b.name])+b.name : "❓ ？？？"}${b.night?' <small class="muted">夜</small>':""}</span>
       <span class="${got?"bells":"muted"}">${got? b.price+"ベル" : "—"}</span></div>`;
   }).join("");
   const total = caughtFish.size + caughtBug.size;
   const all = FISH_DEFS.length + BUG_DEFS.length;
   bookPanel.innerHTML = `
     <button class="close" data-close="1">✕</button>
-    <h2>📖 いきもの ずかん　<small>${total} / ${all}</small></h2>
-    <h3>🎣 さかな</h3>${fishRows}
-    <h3>🦋 むし</h3>${bugRows}
-    <h3>きろく</h3>
-    <div class="row"><span class="nm">👧 ${pName()} ＆ 🐕 ${dName()}</span><button data-rename="1">なまえを かえる</button></div>
+    <h2>📖 生きものずかん　<small>${total} / ${all}</small></h2>
+    <h3>🎣 魚</h3>${fishRows}
+    <h3>🦋 虫</h3>${bugRows}
+    <h3>記録</h3>
+    <div class="row"><span class="nm">👧 ${pName()} ＆ 🐕 ${dName()}</span><button data-rename="1">名前を変える</button></div>
     <div class="row"><span class="nm">🔔 ベル</span><span class="bells">${bells}</span></div>
     <div class="row"><span class="nm">💗 なでなで</span><span>${petCount}</span></div>
-    <div class="row"><span class="nm">🏁 レースゆうしょう</span><span>${raceWins}かい</span></div>
-    <div class="row"><span class="nm">🐕 ${dName()}</span><span>${({puppy:"こいぬ",adult:"おとな",senior:"シニア"})[care.stage]} ・ そだちど ${care.growth}</span></div>
-    <div class="row"><span class="nm">⏰ まえの おさんぽから</span><span>${fmtAbsence(lastAbsenceH)}</span></div>
-    <div class="row"><span class="nm">🏅 おせわ指数</span><span class="bells">${careScore}${rankInfo&&rankInfo.rank?`（${rankInfo.rank}い/${rankInfo.total}にん）`:""}</span></div>
-    <div class="row"><span class="nm">🦴 かせき</span><span>${pocket.fossil}</span></div>`;
+    <div class="row"><span class="nm">🏁 レース優勝</span><span>${raceWins}回</span></div>
+    <div class="row"><span class="nm">🐕 ${dName()}</span><span>${({puppy:"子犬",adult:"大人",senior:"シニア"})[care.stage]} ・ 育ち度 ${care.growth}</span></div>
+    <div class="row"><span class="nm">⏰ 前のお散歩から</span><span>${fmtAbsence(lastAbsenceH)}</span></div>
+    <div class="row"><span class="nm">🏅 お世話指数</span><span class="bells">${careScore}${rankInfo&&rankInfo.rank?`（${rankInfo.rank}位/${rankInfo.total}人）`:""}</span></div>
+    <div class="row"><span class="nm">🦴 化石</span><span>${pocket.fossil}</span></div>`;
   bookPanel.style.display = "block";
 }
 bookBtn.addEventListener("click", toggleBook);
@@ -1740,12 +1750,12 @@ function updateCare(dt){
 function setSick(){
   care.sick = true; care.sickT = 0;
   sfx("sine", 300, 0.4, 0.1, 150);
-  floatTexts.push({x:dog.x, y:dog.y-28, text:`${dName()}の ぐあいが わるそう…`, t:2.6});
+  floatTexts.push({x:dog.x, y:dog.y-28, text:`${dName()}の具合が悪そう…`, t:2.6});
   markSave();
 }
 function feedDog(){
   if(foodStock<=0 || dialog || race || farewell) return;
-  if(care.hunger>=98){ floatTexts.push({x:dog.x, y:dog.y-24, text:"おなか いっぱい みたい", t:1.4}); return; }
+  if(care.hunger>=98){ floatTexts.push({x:dog.x, y:dog.y-24, text:"おなかいっぱいみたい", t:1.4}); return; }
   foodStock--;
   care.hunger = Math.min(100, care.hunger + 40);
   care.growth += 5; checkGrowth();
@@ -1760,11 +1770,11 @@ function feedDog(){
 function checkGrowth(){
   if(care.stage==="puppy" && care.growth>=120){
     care.stage = "adult";
-    popup = { text:`🎉 ${dName()}は りっぱな おとなに なった！`, t:3.2 };
+    popup = { text:`🎉 ${dName()}はりっぱな大人になった！`, t:3.2 };
     fanfare(); addCare(15);
   }else if(care.stage==="adult" && care.growth>=600){
     care.stage = "senior";
-    popup = { text:`✨ ${dName()}は かんろくの シニアに なった`, t:3.2 };
+    popup = { text:`✨ ${dName()}はかんろくのシニアになった`, t:3.2 };
     jingle(); addCare(15);
   }
   markSave();
@@ -1782,7 +1792,7 @@ function newPuppy(){
   dogName = "";
   dog.x = player.x - 24; dog.y = player.y + 6;
   markSave(); doSave();
-  popup = { text:"🐶 あたらしい こいぬが やってきた！", t:3 };
+  popup = { text:"🐶 新しい子犬がやってきた！", t:3 };
   jingle();
   setTimeout(openNamePanel, 800);
 }
@@ -2570,7 +2580,7 @@ function drawRaceUI(){
     uictx.font = `bold ${5*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
     uictx.textAlign = "center";
     uictx.strokeStyle = "#fff"; uictx.lineWidth = 4;
-    const msg = R.heat>0 ? "💦 いきぎれ…！" : "れんだで おうえん！🐾";
+    const msg = R.heat>0 ? "💦 いき切れ…！" : "連打でおうえん！🐾";
     uictx.strokeText(msg, wpx/2, gy - 4*sc);
     uictx.fillStyle = R.heat>0 ? "#c0392b" : "#7a4a2f";
     uictx.fillText(msg, wpx/2, gy - 4*sc);
@@ -2581,13 +2591,13 @@ function drawRaceUI(){
     uictx.textAlign = "center";
     uictx.font = `bold ${8*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
     uictx.fillStyle = "#c05577";
-    uictx.fillText(`${["🥇","🥈","🥉","🐾"][R.rank]} ${R.rank+1}い！`, wpx/2, hpx*0.41);
+    uictx.fillText(`${["🥇","🥈","🥉","🐾"][R.rank]} ${R.rank+1}位！`, wpx/2, hpx*0.41);
     uictx.font = `bold ${5.4*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
     uictx.fillStyle = "#7a4a2f";
-    uictx.fillText(R.prize>0 ? `しょうきん 🔔${R.prize}ベル！` : "ざんねん… また ちょうせんしてね", wpx/2, hpx*0.48);
+    uictx.fillText(R.prize>0 ? `賞金 🔔${R.prize}ベル！` : "残念… またちょうせんしてね", wpx/2, hpx*0.48);
     uictx.font = `${3.8*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
     uictx.fillStyle = "#bfa893";
-    uictx.fillText("タップ / スペースで もどる", wpx/2, hpx*0.525);
+    uictx.fillText("タップ / スペースでもどる", wpx/2, hpx*0.525);
     uictx.textAlign = "left";
   }
 }
@@ -2943,7 +2953,7 @@ function drawUI(){
       const d = dist(player.x,player.y, v.x,v.y);
       if(d < 39){
         const [sx,sy] = W2S(v.x, v.y - v.h - 6);
-        bubble(sx, sy, `${v.quest?"❗":""}${v.name}と はなす`, sc, true);
+        bubble(sx, sy, `${v.quest?"❗":""}${v.name}と話す`, sc, true);
         break;
       }
     }
@@ -2964,10 +2974,10 @@ function drawUI(){
     const d = dist(player.x,player.y, dog.x,dog.y);
     if(care.sick && d < 60){
       const [sx,sy] = W2S(dog.x, dog.y-dogH);
-      bubble(sx, sy, medCount>0 ? "🐾ボタンで おくすりを あげよう" : "おくすりが ひつよう…（商店で 200ベル）", sc);
+      bubble(sx, sy, medCount>0 ? "🐾ボタンでお薬をあげよう" : "お薬が必要…（商店で200ベル）", sc);
     }else if(d < 45 && !player.moving && player.idleT > 1.2 && ball.state==="none"){
       const [sx,sy] = W2S(dog.x, dog.y-dogH);
-      bubble(sx, sy, care.hunger<25 ? `${dName()}は おなかぺこぺこ…🍖` : `🐾ボタンで なでてね`, sc, true);
+      bubble(sx, sy, care.hunger<25 ? `${dName()}はおなかぺこぺこ…🍖` : `🐾ボタンでなでてね`, sc, true);
     }
   }
   if(fishing && fishing.state==="bite"){
@@ -2993,7 +3003,7 @@ function drawUI(){
   uictx.textBaseline = "middle";
   uictx.fillText(label, 7*csc, 8.5*csc);
   /* おせわチップ */
-  const stageTxt = ({puppy:"🐶こいぬ", adult:"🐕おとな", senior:"🎓シニア"})[care.stage] || "";
+  const stageTxt = ({puppy:"🐶子犬", adult:"🐕大人", senior:"🎓シニア"})[care.stage] || "";
   const hungerIcon = care.hunger<25 ? "🍖⚠" : "🍖";
   const spTxt = ["🌧どんより","⛅ふつう","🌼いきいき","✨きらきら"][spiritTier()];
   const label2 = `${hungerIcon}${Math.round(care.hunger)}%  🥫${foodStock}  💊${medCount}  ${stageTxt}  ${spTxt}${Math.round(spirit)}`;
@@ -3007,10 +3017,10 @@ function drawUI(){
   let label3;
   if(rankInfo && rankInfo.rank){
     const crown = rankInfo.rank===1 ? "👑" : rankInfo.rank===2 ? "🥈" : rankInfo.rank===3 ? "🥉" : "🏅";
-    const gapTxt = rankInfo.rank===1 ? "いま トップ！" : `つぎまで あと${rankInfo.gap}`;
-    label3 = `${crown}${rankInfo.rank}い/${rankInfo.total}にん  指数${careScore}  ${gapTxt}`;
+    const gapTxt = rankInfo.rank===1 ? "今トップ！" : `次まであと${rankInfo.gap}`;
+    label3 = `${crown}${rankInfo.rank}位/${rankInfo.total}人  指数${careScore}  ${gapTxt}`;
   }else{
-    label3 = `🏅 おせわ指数 ${careScore}`;
+    label3 = `🏅 お世話指数 ${careScore}`;
   }
   const fs3 = Math.max(10, 4.2*csc);
   uictx.font = `bold ${fs3}px 'Hiragino Maru Gothic ProN', sans-serif`;
@@ -3115,10 +3125,10 @@ function drawMinimap(wpx, hpx){
   /* タイトル */
   uictx.font = `bold ${5.4*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
   uictx.fillStyle = "#7a4a2f";
-  uictx.fillText("🗺 まちの ちず", wpx/2, my - 22);
+  uictx.fillText("🗺 町の地図", wpx/2, my - 22);
   uictx.font = `${3.6*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
   uictx.fillStyle = "#bfa893";
-  uictx.fillText("タップで とじる", wpx/2, my + mh + 16);
+  uictx.fillText("タップで閉じる", wpx/2, my + mh + 16);
   uictx.textAlign = "left";
 }
 function drawFarewell(wpx, hpx){
@@ -3133,11 +3143,11 @@ function drawFarewell(wpx, hpx){
   uictx.textAlign = "center"; uictx.textBaseline = "middle";
   uictx.font = `bold ${5.8*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
   uictx.fillStyle = "#fff";
-  uictx.fillText(`${dName()}は お空の おさんぽに でかけました…`, wpx/2, hpx*0.45, wpx*0.9);
+  uictx.fillText(`${dName()}はお空のお散歩に出かけました…`, wpx/2, hpx*0.45, wpx*0.9);
   uictx.font = `${4.4*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
   uictx.fillStyle = "#e6dcf5";
-  uictx.fillText("たくさんの おもいでを ありがとう", wpx/2, hpx*0.52);
-  uictx.fillText("いつか きっと また あえるよ", wpx/2, hpx*0.57);
+  uictx.fillText("たくさんの思い出をありがとう", wpx/2, hpx*0.52);
+  uictx.fillText("いつかきっと、また会えるよ", wpx/2, hpx*0.57);
   uictx.textAlign = "left";
 }
 function bubble(sx, sy, text, sc, soft){
@@ -3177,7 +3187,7 @@ if(!playerId){
   if(playerName && lastPlayDay !== today){
     lastPlayDay = today;
     addCare(20);
-    setTimeout(()=>{ floatTexts.push({x:player.x, y:player.y-36, text:"まいにちボーナス +20 ✨", t:2.6}); popSound(); }, 5200);
+    setTimeout(()=>{ floatTexts.push({x:player.x, y:player.y-36, text:"毎日ボーナス +20 ✨", t:2.6}); popSound(); }, 5200);
   }
 }
 setTimeout(()=>{ if(playerName) submitScore(); }, 2500);
@@ -3187,7 +3197,7 @@ setTimeout(()=>{ if(playerName) submitScore(); }, 2500);
   const pp = document.getElementById("promisePanel");
   if(dogName){
     document.getElementById("promiseWait").textContent =
-      dogName + "は、きょうも あなたを まっていました。";
+      dogName + "は、今日もあなたを待っていました。";
   }
   document.getElementById("promiseOk").addEventListener("click", ()=>{
     pp.style.display = "none";
@@ -3205,12 +3215,12 @@ if(!playerName){
 }
 /* おかえりメッセージ：るすの じかんと わんこの ようすを つたえる */
 if(lastAbsenceH >= 6 && playerName){
-  setTimeout(()=>{ popup = { text:`⏰ るすに していた じかん：${fmtAbsence(lastAbsenceH)}`, t:4.5 }; }, 1000);
+  setTimeout(()=>{ popup = { text:`⏰ 留守にしていた時間：${fmtAbsence(lastAbsenceH)}`, t:4.5 }; }, 1000);
   setTimeout(()=>{
     if(farewell || pendingFarewell) return;
-    const msg = care.sick ? `${dName()}が びょうきに なっちゃった…！` :
-                care.hunger < 25 ? `${dName()}は おなか ぺこぺこで まってた…` :
-                `${dName()}が しっぽを ふって まってたよ！`;
+    const msg = care.sick ? `${dName()}が病気になっちゃった…！` :
+                care.hunger < 25 ? `${dName()}はおなかぺこぺこで待ってた…` :
+                `${dName()}がしっぽをふって待ってたよ！`;
     floatTexts.push({x:dog.x, y:dog.y-32, text:msg, t:3.2});
     if(care.sick || care.hunger < 25) sfx("sine", 340, 0.4, 0.09, 170);
   }, 3000);
