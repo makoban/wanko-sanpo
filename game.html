@@ -201,6 +201,7 @@
       </div>
       <button id="nameOk" class="name-ok">これで はじめる！</button>
     </div>
+    <div id="racePanel" class="panel"></div>
   </div>
 </div>
 
@@ -247,8 +248,8 @@ window.addEventListener("keydown", e=>{
   if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ","Spacebar"].includes(e.key)) e.preventDefault();
   if((e.key===" "||e.key==="Spacebar") && !keys[" "]) actPressed = true;
   if(e.key==="b" || e.key==="B") toggleBook();
-  if((e.key==="z" || e.key==="Z") && hasBall && ball.state==="none" && !dialog && !fishing) throwBall();
-  if(e.key==="Escape") closePanels();
+  if((e.key==="z" || e.key==="Z") && hasBall && ball.state==="none" && !dialog && !fishing && !race) throwBall();
+  if(e.key==="Escape"){ closePanels(); if(race) race = null; }
   keys[e.key] = true;
   if(e.key.length===1) keys[e.key.toLowerCase()] = true;
   initAudio();
@@ -266,7 +267,7 @@ const stickKnob = document.getElementById("stickKnob");
 const actBtn = document.getElementById("act");
 const ballBtn2 = document.getElementById("ballBtn");
 ballBtn2.addEventListener("click", ()=>{
-  if(hasBall && ball.state==="none" && !dialog && !fishing) throwBall();
+  if(hasBall && ball.state==="none" && !dialog && !fishing && !race) throwBall();
 });
 let touchId = null, touchOrigin = null, touchMoved = false, touchT0 = 0;
 const touchVec = {x:0, y:0};
@@ -280,8 +281,10 @@ function placeStick(bx,by,kx,ky){
 }
 stage.addEventListener("touchstart", e=>{
   if(e.target.closest(".panel") || e.target===muteBtn || e.target===bookBtn || e.target===ballBtn2) return;
+  /* レースちゅうは タップ＝おうえん れんだ */
+  if(race){ actPressed = true; e.preventDefault(); return; }
   /* パネルが ひらいているとき、そとをタップしたら とじるだけ */
-  if(shopPanel.style.display==="block" || bookPanel.style.display==="block"){
+  if(shopPanel.style.display==="block" || bookPanel.style.display==="block" || document.getElementById("racePanel").style.display==="block"){
     closePanels();
     e.preventDefault();
     return;
@@ -544,7 +547,7 @@ const bugDef = n => BUG_DEFS.find(b=>b.name===n);
 
 /* ================= もちもの・セーブ ================= */
 let bells = 0, hasBall = false, bandana = null, petCount = 0;
-let playerName = "", dogName = "";
+let playerName = "", dogName = "", raceWins = 0;
 const pName = ()=> playerName || "あなた";
 const dName = ()=> dogName || "わんちゃん";
 const pocket = { apple:0, fossil:0 };
@@ -558,7 +561,7 @@ function doSave(){
     const love = {};
     for(const v of VILLAGERS) love[v.key] = v.love;
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      bells, hasBall, bandana, petCount, playerName, dogName,
+      bells, hasBall, bandana, petCount, playerName, dogName, raceWins,
       apple:pocket.apple, fossil:pocket.fossil,
       fishInv, bugInv,
       caughtFish:[...caughtFish], caughtBug:[...caughtBug],
@@ -574,6 +577,7 @@ function loadSave(){
     bells = d.bells||0; hasBall = !!d.hasBall; bandana = d.bandana||null;
     petCount = d.petCount||0;
     playerName = d.playerName||""; dogName = d.dogName||"";
+    raceWins = d.raceWins||0;
     pocket.apple = d.apple||0; pocket.fossil = d.fossil||0;
     Object.assign(fishInv, d.fishInv||{});
     Object.assign(bugInv, d.bugInv||{});
@@ -669,6 +673,9 @@ const benches = [{tx:16,ty:22},{tx:22,ty:35}];
 for(const b of benches){ solid[b.ty][b.tx]=true; solid[b.ty][b.tx+1]=true; }
 const lamps = [[13,22],[26,22],[13,27],[26,27],[9,19],[30,19],[10,32],[29,35],[14,48],[5,55]];
 lamps.forEach(l=>{ if(!solid[l[1]][l[0]]) solid[l[1]][l[0]]=true; });
+/* ドッグレースじょうの ゲート（こうえんの ひがし） */
+const RACEGATE = { tx:34, ty:37 };
+solid[37][34]=true; solid[37][35]=true; solid[37][36]=true;
 
 /* ================= キャラクター ================= */
 const player = { x:19.6*T, y:29.5*T, dir:"down", moving:false, frame:0, animT:0, idleT:0 };
@@ -1054,6 +1061,11 @@ function tryAction(){
     const d = dist(player.x,player.y, STALL.tx*T+24, STALL.ty*T+30);
     if(d < 51) cands.push({d:d*0.85, f:openShop});
   }
+  /* レースじょう */
+  {
+    const d = dist(player.x,player.y, RACEGATE.tx*T+36, RACEGATE.ty*T+12);
+    if(d < 54) cands.push({d:d*0.85, f:openRaceGate});
+  }
   /* むし */
   for(const b of bugs){
     const d = dist(player.x,player.y, b.x,b.y);
@@ -1119,8 +1131,9 @@ function tryAction(){
 const shopPanel = document.getElementById("shopPanel");
 const bookPanel = document.getElementById("bookPanel");
 function closePanels(){
-  if(shopPanel.style.display==="block" || bookPanel.style.display==="block") uiClose();
-  shopPanel.style.display = "none"; bookPanel.style.display = "none";
+  const rp = document.getElementById("racePanel");
+  if(shopPanel.style.display==="block" || bookPanel.style.display==="block" || rp.style.display==="block") uiClose();
+  shopPanel.style.display = "none"; bookPanel.style.display = "none"; rp.style.display = "none";
 }
 /* --- なまえ入力パネル --- */
 const namePanel = document.getElementById("namePanel");
@@ -1138,6 +1151,124 @@ document.getElementById("nameOk").addEventListener("click", ()=>{
   jingle();
   floatTexts.push({x:player.x, y:player.y-30, text:`${playerName}と${dogName}、おさんぽびより！`, t:2.4});
 });
+
+/* ================= ドッグレースじょう ================= */
+let race = null;
+const RACE_CLASSES = [
+  {name:"ビギナー",     fee:100, prizes:[300,150,50]},
+  {name:"プロ",         fee:300, prizes:[900,450,150]},
+  {name:"チャンピオン", fee:500, prizes:[1500,750,250]}
+];
+const RIVAL_DEFS = [
+  {name:"シロ",  color:"rgba(245,245,245,0.55)"},
+  {name:"チョビ", color:"rgba(120,88,58,0.5)"},
+  {name:"ゴン",  color:"rgba(95,95,120,0.5)"}
+];
+const racePanel = document.getElementById("racePanel");
+function tintCanvas(src, color){
+  const c = document.createElement("canvas");
+  c.width = src.width; c.height = src.height;
+  const g = c.getContext("2d");
+  g.drawImage(src, 0, 0);
+  g.globalCompositeOperation = "source-atop";
+  g.fillStyle = color;
+  g.fillRect(0, 0, c.width, c.height);
+  return c;
+}
+function openRaceGate(){
+  shopPanel.style.display = "none"; bookPanel.style.display = "none";
+  const rows = RACE_CLASSES.map((c,i)=>`
+    <div class="row"><span class="nm">${["🐣","🏃","👑"][i]} ${c.name}<br>
+      <small class="muted">1い しょうきん ${c.prizes[0]}ベル</small></span>
+      <button data-race="${i}" ${bells>=c.fee?"":"disabled"}>${c.fee}ベルで はしる</button></div>`).join("");
+  racePanel.innerHTML = `
+    <button class="close" data-close="1">✕</button>
+    <h2>🏁 ドッグレースじょう</h2>
+    <div>${dName()}と いっしょに 1いを めざそう！<br>
+      <small class="muted">レースちゅうは スペース／タップの れんだで おうえん。おしすぎると いきぎれ しちゃうよ！</small></div>
+    <div style="margin-top:8px;">もっている ベル：<span class="bells">🔔 ${bells}</span></div>
+    <h3>クラスを えらぶ</h3>
+    ${rows}`;
+  racePanel.style.display = "block";
+  uiOpen();
+}
+racePanel.addEventListener("click", e=>{
+  if(e.target.dataset.close){ closePanels(); return; }
+  if(e.target.dataset.race !== undefined) startRace(+e.target.dataset.race);
+});
+function startRace(cls){
+  const C = RACE_CLASSES[cls];
+  if(bells < C.fee){ floatTexts.push({x:player.x, y:player.y-20, text:"ベルが たりない…", t:1.5}); return; }
+  bells -= C.fee; markSave();
+  closePanels();
+  const base = [93,105,117][cls];
+  const mkFrames = (col)=> SPR.dog ? SPR.dog.sideR.map(fr=>({c:tintCanvas(fr.c,col), w:fr.w, h:fr.h})) : null;
+  race = { cls, state:"count", t:0, runT:0, L:1500, camX:0, gauge:0, heat:0,
+    finished:[], lastC:0, rank:0, prize:0, doneT:0,
+    dogs:[
+      {me:true, name:dName(), lane:0, x:0, done:0},
+      ...RIVAL_DEFS.map((rd,i)=>({name:rd.name, lane:i+1, x:0, done:0,
+        base: base - 4 + Math.random()*9, wob: Math.random()*6, frames: mkFrames(rd.color)}))
+    ]};
+  uiOpen();
+}
+function updateRace(dt){
+  const R = race;
+  R.t += dt;
+  const me = R.dogs[0];
+  if(R.state === "count"){
+    const c = 3 - Math.floor(R.t);
+    if(R.lastC !== c && c >= 1){ R.lastC = c; sfx("square", 520, 0.12, 0.1); }
+    if(R.t >= 3){ R.state = "run"; R.runT = 0; sfx("square", 1040, 0.35, 0.12); }
+    actPressed = false;
+    return;
+  }
+  if(R.state === "run"){
+    R.runT += dt;
+    if(actPressed){
+      actPressed = false;
+      if(R.heat <= 0){
+        R.gauge = Math.min(112, R.gauge + 15);
+        noiseSfx(0.03, 0.028, 3000, 1500, "highpass");
+        if(R.gauge >= 110){ R.heat = 1.3; R.gauge = 30; sfx("sine", 300, 0.3, 0.1, 120); }
+      }
+    }
+    R.gauge = Math.max(0, R.gauge - 26*dt);
+    if(R.heat > 0) R.heat -= dt;
+    if(!me.done){
+      const sp = 92 + R.gauge*0.95 - (R.heat>0 ? 60 : 0);
+      me.x += Math.max(30, sp)*dt;
+      if(me.x >= R.L){ me.done = R.t; R.finished.push(me); jingle(); }
+    }
+    const lead = Math.max(...R.dogs.map(d=>d.x));
+    for(const d of R.dogs){
+      if(d.me || d.done) continue;
+      let sp = d.base + Math.sin(R.runT*2 + d.wob)*7;
+      if(lead - d.x > 220) sp += 16;          /* おいつき */
+      if(d.x >= lead - 1) sp -= 8;            /* トップは ちょっと ゆだん */
+      d.x += sp*dt;
+      if(d.x >= R.L){ d.done = R.t; R.finished.push(d); pom(); }
+    }
+    R.camX = clamp(me.x - VW*0.35, 0, R.L + 90 - VW);
+    if(me.done && (R.finished.length === 4 || R.t > me.done + 2)){
+      const rest = R.dogs.filter(d=>!d.done).sort((a,b)=>b.x-a.x);
+      for(const d of rest){ d.done = R.t; R.finished.push(d); }
+      R.rank = R.finished.indexOf(me);
+      R.prize = R.rank < 3 ? RACE_CLASSES[R.cls].prizes[R.rank] : 0;
+      bells += R.prize;
+      if(R.rank === 0) raceWins++;
+      markSave();
+      R.state = "done"; R.doneT = R.t;
+      const rk = R.rank, pz = R.prize;
+      setTimeout(()=>{ rk===0 ? fanfare() : (pz>0 ? coinSfx() : uiClose()); }, 300);
+    }
+  }else if(R.state === "done"){
+    if((actPressed && R.t > R.doneT + 0.8) || R.t > R.doneT + 8){
+      race = null;
+    }
+    actPressed = false;
+  }
+}
 function sellRow(label, count, total, fn){
   return `<div class="row"><span class="nm">${label} × ${count}</span>
     <span class="bells">${total}ベル</span>
@@ -1217,6 +1348,7 @@ function toggleBook(){
     <div class="row"><span class="nm">👧 ${pName()} ＆ 🐕 ${dName()}</span><button data-rename="1">なまえを かえる</button></div>
     <div class="row"><span class="nm">🔔 ベル</span><span class="bells">${bells}</span></div>
     <div class="row"><span class="nm">💗 なでなで</span><span>${petCount}</span></div>
+    <div class="row"><span class="nm">🏁 レースゆうしょう</span><span>${raceWins}かい</span></div>
     <div class="row"><span class="nm">🦴 かせき</span><span>${pocket.fossil}</span></div>`;
   bookPanel.style.display = "block";
 }
@@ -1243,6 +1375,8 @@ function update(dt){
   time += dt;
   tickMusic();
   const phase = dayPhase();
+
+  if(race){ updateRace(dt); return; }
 
   if(actPressed){ tryAction(); actPressed = false; }
 
@@ -1738,6 +1872,148 @@ function drawBush(b){
   ctx.fillStyle="#8bcf70"; ctx.fillRect(x+6,y+6,3,3);
 }
 
+function drawRaceGate(){
+  const x = RACEGATE.tx*T, y = RACEGATE.ty*T;
+  /* ポール */
+  ctx.fillStyle = "#4a3228"; ctx.fillRect(x+1, y-32, 8, 56); ctx.fillRect(x+63, y-32, 8, 56);
+  ctx.fillStyle = "#8a5a3a"; ctx.fillRect(x+2, y-31, 6, 54); ctx.fillRect(x+64, y-31, 6, 54);
+  /* だんまく */
+  ctx.fillStyle = "#4a3228"; ctx.fillRect(x, y-34, 72, 20);
+  ctx.fillStyle = "#ff8fae"; ctx.fillRect(x+2, y-32, 68, 16);
+  for(let i=0;i<5;i++) for(let j=0;j<2;j++){
+    ctx.fillStyle = (i+j)%2 ? "#fff" : "#4a3228";
+    ctx.fillRect(x+4+i*5, y-30+j*6, 5, 6);
+    ctx.fillRect(x+43+i*5, y-30+j*6, 5, 6);
+  }
+  /* ほねマーク */
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(x+33, y-26, 8, 4);
+  ctx.fillRect(x+31, y-28, 3, 3); ctx.fillRect(x+31, y-23, 3, 3);
+  ctx.fillRect(x+40, y-28, 3, 3); ctx.fillRect(x+40, y-23, 3, 3);
+  /* はた */
+  ctx.fillStyle = "#ffd166"; ctx.fillRect(x+5, y-41, 11, 7);
+  ctx.fillStyle = "#5b8dd6"; ctx.fillRect(x+58, y-41, 11, 7);
+}
+
+/* ---- レース画面 ---- */
+function drawRace(){
+  const R = race;
+  ctx.fillStyle = "#aee3f5"; ctx.fillRect(0, 0, VW, VH);
+  const top = Math.round(VH*0.30);
+  const laneH = Math.round(Math.min(48, (VH*0.52)/4));
+  /* かんきゃくせきの しばふ */
+  ctx.fillStyle = "#67b34e"; ctx.fillRect(0, 0, VW, top);
+  /* かんきゃく（住民たち） */
+  for(let i=0;i<14;i++){
+    const sh = SPR[SHEET_NAMES[2 + (i%8)]];
+    if(!sh) break;
+    const fr = sh.down[0];
+    let cx = (i*54 - R.camX*0.2) % (VW+100);
+    if(cx < -50) cx += VW+100;
+    const bob = Math.abs(Math.sin(time*5 + i)) * (R.state==="run" ? 5 : 2);
+    ctx.drawImage(fr.c, Math.round(cx-40), Math.round(top-14-fr.h*0.72 - bob), Math.round(fr.w*0.72), Math.round(fr.h*0.72));
+  }
+  /* さく */
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, top-10, VW, 5);
+  ctx.fillStyle = "#e0d6c4"; ctx.fillRect(0, top-5, VW, 3);
+  /* トラック */
+  for(let l=0;l<4;l++){
+    ctx.fillStyle = l%2 ? "#eed9a9" : "#e4cc94";
+    ctx.fillRect(0, top+l*laneH, VW, laneH);
+  }
+  ctx.save();
+  ctx.translate(-Math.round(R.camX), 0);
+  /* スタート・ゴールの チェッカーライン */
+  for(const gx of [26, R.L+40]){
+    for(let yy=0; yy<4*laneH; yy+=8) for(let k=0;k<2;k++){
+      ctx.fillStyle = ((yy/8+k)%2) ? "#fff" : "#4a3228";
+      ctx.fillRect(gx+k*6, top+yy, 6, 8);
+    }
+  }
+  /* いぬたち */
+  for(const d of R.dogs){
+    const y = top + d.lane*laneH + laneH - 5;
+    ctx.fillStyle = "rgba(60,90,50,0.25)";
+    ctx.beginPath(); ctx.ellipse(d.x+46, y+3, 13, 4, 0, 0, 7); ctx.fill();
+    const frames = d.me ? (SPR.dog ? SPR.dog.sideR : null) : d.frames;
+    if(frames){
+      const running = R.state==="run" && !d.done;
+      const fr = running ? frames[1 + (Math.floor(time*14 + d.lane*3)%2)] : frames[0];
+      ctx.drawImage(fr.c, Math.round(d.x+46-fr.w/2), Math.round(y-fr.h+4));
+      if(d.me && bandana){
+        ctx.fillStyle = bandana;
+        ctx.fillRect(Math.round(d.x+46-6), Math.round(y-fr.h*0.45), 12, 4);
+      }
+      if(d.me && R.heat>0){
+        ctx.fillStyle = "#7fd0f0";
+        ctx.fillRect(Math.round(d.x+46+12), Math.round(y-fr.h-6), 4, 6);
+      }
+    }
+  }
+  ctx.restore();
+  /* てまえの くさ */
+  ctx.fillStyle = "#8ecf6f";
+  ctx.fillRect(0, top+4*laneH, VW, VH-(top+4*laneH));
+  ctx.fillStyle = "#7fc46a";
+  for(let i=0;i<VW;i+=18) ctx.fillRect(i+((i*7)%9), top+4*laneH+6+((i*13)%14), 3, 5);
+}
+function drawRaceUI(){
+  const wpx = ui.width, hpx = ui.height;
+  const sc = (wpx / VW) * 1.5;
+  const R = race;
+  uictx.textBaseline = "middle";
+  /* しんこうバー */
+  const bw = wpx*0.72, bx = wpx*0.14, by = hpx*0.05;
+  roundRect(uictx, bx, by, bw, 3.4*sc, 1.7*sc, "rgba(255,255,255,0.65)");
+  for(const d of R.dogs){
+    const px = bx + bw * Math.min(1, d.x / R.L);
+    uictx.font = `${(d.me?6:4.2)*sc}px sans-serif`;
+    uictx.textAlign = "center";
+    uictx.fillText(d.me ? "🐕" : "🐾", px, by + 1.7*sc);
+  }
+  uictx.textAlign = "left";
+  if(R.state === "count"){
+    const c = 3 - Math.floor(R.t);
+    const txt = c >= 1 ? String(c) : "GO!";
+    uictx.font = `bold ${16*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.textAlign = "center";
+    uictx.strokeStyle = "#fff"; uictx.lineWidth = 8;
+    uictx.strokeText(txt, wpx/2, hpx*0.45);
+    uictx.fillStyle = "#e0648d";
+    uictx.fillText(txt, wpx/2, hpx*0.45);
+    uictx.textAlign = "left";
+  }
+  if(R.state === "run"){
+    const gw = wpx*0.6, gx = wpx*0.2, gy = hpx*0.87;
+    roundRect(uictx, gx, gy, gw, 5*sc, 2.5*sc, "rgba(255,255,255,0.75)");
+    const ratio = Math.min(1, R.gauge/110);
+    if(ratio > 0.02)
+      roundRect(uictx, gx, gy, gw*ratio, 5*sc, 2.5*sc, R.heat>0 ? "#e05757" : (ratio>0.8 ? "#f0a050" : "#7fc46a"));
+    uictx.font = `bold ${5*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.textAlign = "center";
+    uictx.strokeStyle = "#fff"; uictx.lineWidth = 4;
+    const msg = R.heat>0 ? "💦 いきぎれ…！" : "れんだで おうえん！🐾";
+    uictx.strokeText(msg, wpx/2, gy - 4*sc);
+    uictx.fillStyle = R.heat>0 ? "#c0392b" : "#7a4a2f";
+    uictx.fillText(msg, wpx/2, gy - 4*sc);
+    uictx.textAlign = "left";
+  }
+  if(R.state === "done"){
+    roundRect(uictx, wpx*0.1, hpx*0.34, wpx*0.8, hpx*0.22, 5*sc, "rgba(255,250,240,0.96)");
+    uictx.textAlign = "center";
+    uictx.font = `bold ${8*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.fillStyle = "#c05577";
+    uictx.fillText(`${["🥇","🥈","🥉","🐾"][R.rank]} ${R.rank+1}い！`, wpx/2, hpx*0.41);
+    uictx.font = `bold ${5.4*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.fillStyle = "#7a4a2f";
+    uictx.fillText(R.prize>0 ? `しょうきん 🔔${R.prize}ベル！` : "ざんねん… また ちょうせんしてね", wpx/2, hpx*0.48);
+    uictx.font = `${3.8*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.fillStyle = "#bfa893";
+    uictx.fillText("タップ / スペースで もどる", wpx/2, hpx*0.525);
+    uictx.textAlign = "left";
+  }
+}
+
 function drawGirl(){
   if(SPR.girl){
     const set = player.dir==="left" ? SPR.girl.side
@@ -1840,6 +2116,7 @@ function drawBug(b, nightF){
 }
 
 function drawWorld(){
+  if(race){ drawRace(); return; }
   const phase = dayPhase();
   cam.x = Math.round(clamp(player.x - VW/2, 0, MW*T-VW));
   cam.y = Math.round(clamp(player.y - VH/2, 0, MH*T-VH));
@@ -1896,6 +2173,7 @@ function drawWorld(){
   for(const l of lamps) items.push({y:(l[1]+1)*T, f:()=>drawLamp(l, phase.night)});
   items.push({y:(FOUNTAIN.ty+FOUNTAIN.th)*T, f:drawFountain});
   items.push({y:(STALL.ty+2)*T, f:drawStall});
+  items.push({y:(RACEGATE.ty+1)*T, f:drawRaceGate});
   for(const c of critters){
     items.push({y:c.y+12, f:()=>{
       const bob = Math.round(Math.sin(time*2.5+c.phase)*1.5);
@@ -1982,6 +2260,7 @@ function drawHeart(x,y,a){
 function drawUI(){
   const wpx = ui.width, hpx = ui.height;
   uictx.clearRect(0,0,wpx,hpx);
+  if(race){ drawRaceUI(); return; }
   const psc = wpx / VW;           /* 位置変換用 */
   const sc = psc * 1.5;           /* 文字・ふきだしサイズ用（320px時代の基準を維持） */
   const W2S = (wx,wy)=>[(wx-cam.x)*psc, (wy-cam.y)*psc];
@@ -2183,7 +2462,9 @@ window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundIte
   addBells:(n)=>{ bells += n; },
   setBall:(v)=>{ hasBall = v; },
   setDayT:(t)=>{ dayOffset = t - (time % DAY_LEN); },
-  openShop, toggleBook, openNamePanel,
+  openShop, toggleBook, openNamePanel, openRaceGate, startRace,
+  get race(){ return race; },
+  get raceWins(){ return raceWins; },
   get names(){ return {playerName, dogName}; } };
 </script>
 </body>
