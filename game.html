@@ -63,7 +63,7 @@
     position:absolute; inset:0; width:100%; height:100%;
     pointer-events:none;
   }
-  #mute, #book{
+  #mute, #book, #mapBtn{
     position:absolute; right:18px; z-index:5;
     border:none; cursor:pointer;
     width:44px; height:44px; border-radius:50%;
@@ -73,7 +73,14 @@
   }
   #mute{ top:18px; }
   #book{ top:70px; }
-  #mute:active, #book:active{ transform:scale(.9); }
+  #mapBtn{ top:122px; }
+  #mute:active, #book:active, #mapBtn:active{ transform:scale(.9); }
+  #act::after, #ballBtn::after, #feedBtn::after{
+    content:attr(data-label);
+    position:absolute; left:50%; bottom:-15px; transform:translateX(-50%);
+    font-size:10px; font-weight:bold; color:#7a4a2f; white-space:nowrap;
+    text-shadow:0 1px 0 #fff, 0 -1px 0 #fff, 1px 0 0 #fff, -1px 0 0 #fff;
+  }
   #stickBase, #stickKnob{
     position:absolute; border-radius:50%; pointer-events:none; display:none; z-index:6;
     transform:translate(-50%,-50%);
@@ -164,24 +171,23 @@
   body.touch .hint-sp{ display:block; }
   body.touch .hint-pc{ display:none; }
   @media (max-width:700px){
-    /* スマホは 1画面に ぴったり収める（縦スクロールなし） */
+    /* スマホ：タイトル・説明なし、マップを全画面に */
     html, body{ height:100dvh; overflow:hidden; }
-    body{ padding:4px 6px 0; }
-    h1{ margin-bottom:0; line-height:1; }
-    h1 img{ height:32px !important; }
-    .sub{ display:none; }
+    body{ padding:0; }
+    h1, .sub{ display:none; }
     .hint{ display:none !important; }
     #frame{
-      padding:5px; border-radius:14px;
-      width:min(96vw, 480px);
+      padding:0; border-radius:0; box-shadow:none;
+      width:min(100vw, 480px);
     }
-    #frame::before, #frame::after{ font-size:16px; top:-9px; }
-    #mute, #book{ width:38px; height:38px; font-size:16px; right:12px; }
-    #mute{ top:12px; } #book{ top:56px; }
-    #act{ width:56px; height:56px; font-size:26px; right:12px; bottom:12px; }
-    #ballBtn{ right:12px; bottom:80px; width:48px; height:48px; }
-    #feedBtn{ right:12px; bottom:134px; width:48px; height:48px; }
-    .panel{ font-size:13px; inset:4% 3%; }
+    #frame::before, #frame::after{ display:none; }
+    #stage{ border-radius:0; }
+    #mute, #book, #mapBtn{ width:40px; height:40px; font-size:17px; right:10px; }
+    #mute{ top:10px; } #book{ top:58px; } #mapBtn{ top:106px; }
+    #act{ width:58px; height:58px; font-size:27px; right:12px; bottom:22px; }
+    #ballBtn{ right:14px; bottom:96px; width:50px; height:50px; }
+    #feedBtn{ right:14px; bottom:164px; width:50px; height:50px; }
+    .panel{ font-size:14px; inset:4% 3%; }
   }
   @media (max-width:700px) and (max-height:540px){
     /* よこもち */
@@ -207,11 +213,12 @@
     <canvas id="ui"></canvas>
     <button id="mute" title="おんがく">🔇</button>
     <button id="book" title="ずかん">📖</button>
+    <button id="mapBtn" title="まちのちず">🗺</button>
     <div id="stickBase"></div>
     <div id="stickKnob"></div>
-    <button id="act" title="アクション">🐾</button>
-    <button id="ballBtn" title="ボールをなげる">🎾</button>
-    <button id="feedBtn" title="ごはんをあげる">🍖</button>
+    <button id="act" title="わんこ" data-label="わんこ">🐾</button>
+    <button id="ballBtn" title="ボールをなげる" data-label="ボール">🎾</button>
+    <button id="feedBtn" title="ごはんをあげる" data-label="ごはん">🍖</button>
     <div id="shopPanel" class="panel"></div>
     <div id="bookPanel" class="panel"></div>
     <div id="namePanel" class="panel">
@@ -231,7 +238,7 @@
 </div>
 
 <p class="hint hint-pc">
-  🎮 <b>やじるしキー / WASD</b>：あるく　　🖐 <b>スペース</b>：はなす ・ なでる ・ つる ・ ほる ・ かたづける　　🍖 <b>F</b>：ごはん　　🎾 <b>Z</b>：ボール　　📖 <b>B</b>：ずかん
+  🎮 <b>やじるしキー / WASD</b>：あるく　　🖐 <b>スペース</b>：しらべる（はなす・つる・ほる…）　　🐾 <b>X</b>：わんこ（なでる・よぶ）　　🍖 <b>F</b>：ごはん　　🎾 <b>Z</b>：ボール　　🗺 <b>M</b>：ちず　　📖 <b>B</b>：ずかん
 </p>
 <p class="hint hint-sp">
   📱 <b>ゆびで ドラッグ</b>：あるく　　🐾 <b>タップ</b>：はなす ・ なでる ・ とる ・ ほる　　🎾ボタン：ボール
@@ -259,10 +266,10 @@ function applyViewport(){
   let nVW, nVH;
   if(portrait){
     /* 画面の縦横比に合わせてキャンバスの縦を決める（余白なくフル表示） */
-    const stageW = Math.min(window.innerWidth*0.96, 480) - 10;
-    const availH = window.innerHeight - 56 - 10;
+    const stageW = Math.min(window.innerWidth, 480);
+    const availH = window.innerHeight - 2;
     nVW = 336;
-    nVH = Math.max(400, Math.min(720, Math.round(336 * availH / stageW)));
+    nVH = Math.max(400, Math.min(780, Math.round(336 * availH / stageW)));
   }else{
     nVW = 480; nVH = 360;
   }
@@ -294,7 +301,9 @@ window.addEventListener("keydown", e=>{
   if(e.key==="b" || e.key==="B") toggleBook();
   if((e.key==="z" || e.key==="Z") && hasBall && ball.state==="none" && !dialog && !fishing && !race) throwBall();
   if((e.key==="f" || e.key==="F") && !dialog && !fishing && !race) feedDog();
-  if(e.key==="Escape"){ closePanels(); if(race) race = null; }
+  if(e.key==="x" || e.key==="X") dogAction();
+  if(e.key==="m" || e.key==="M"){ mapOpen = !mapOpen; mapOpen ? uiOpen() : uiClose(); }
+  if(e.key==="Escape"){ closePanels(); mapOpen = false; if(race) race = null; }
   keys[e.key] = true;
   if(e.key.length===1) keys[e.key.toLowerCase()] = true;
   initAudio();
@@ -328,6 +337,8 @@ stage.addEventListener("touchstart", e=>{
   if(e.target.closest(".panel") || e.target===muteBtn || e.target===bookBtn || e.target===ballBtn2 || e.target.id==="feedBtn") return;
   /* レースちゅうは タップ＝おうえん れんだ */
   if(race){ actPressed = true; e.preventDefault(); return; }
+  /* ちずが ひらいていたら とじる */
+  if(mapOpen){ mapOpen = false; uiClose(); e.preventDefault(); return; }
   /* パネルが ひらいているとき、そとをタップしたら とじるだけ */
   if(shopPanel.style.display==="block" || bookPanel.style.display==="block" || document.getElementById("racePanel").style.display==="block"){
     closePanels();
@@ -337,7 +348,7 @@ stage.addEventListener("touchstart", e=>{
   document.body.classList.add("touch");
   initAudio();
   for(const t of e.changedTouches){
-    if(t.target === actBtn){ actPressed = true; continue; }
+    if(t.target === actBtn){ dogAction(); continue; }
     if(touchId === null){
       touchId = t.identifier;
       touchMoved = false; touchT0 = performance.now();
@@ -785,6 +796,25 @@ lamps.forEach(l=>{ if(!solid[l[1]][l[0]]) solid[l[1]][l[0]]=true; });
 const RACEGATE = { tx:34, ty:37 };
 solid[37][34]=true; solid[37][35]=true; solid[37][36]=true;
 
+/* ミニマップ（地形を1回だけ描いておく） */
+let MINI = null;
+function buildMinimap(){
+  MINI = document.createElement("canvas");
+  MINI.width = MW*3; MINI.height = MH*3;
+  const g = MINI.getContext("2d");
+  for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){
+    const v = ground[y][x];
+    g.fillStyle = v==="w" ? "#6ec6e6" : v==="p" ? "#eed9a9" : v==="d" ? "#b07a4a" : v==="f" ? "#a8dd8d" : "#8ecf6f";
+    g.fillRect(x*3, y*3, 3, 3);
+  }
+  for(const tr of trees){ g.fillStyle = tr.cherry ? "#ff9ec4" : "#4f9c3d"; g.fillRect(tr.tx*3, tr.ty*3, 3, 3); }
+  for(const h of houses){ g.fillStyle = h.roof; g.fillRect(h.tx*3, h.ty*3, 12, 12); }
+  g.fillStyle = "#5aa7c7"; g.fillRect(FOUNTAIN.tx*3, FOUNTAIN.ty*3, 12, 12);
+  g.fillStyle = "#ff8fae"; g.fillRect(STALL.tx*3, STALL.ty*3, 6, 6);
+  g.fillStyle = "#4a3228"; g.fillRect(RACEGATE.tx*3, RACEGATE.ty*3, 9, 3);
+}
+buildMinimap();
+
 /* ================= キャラクター ================= */
 const player = { x:19.6*T, y:29.5*T, dir:"down", moving:false, frame:0, animT:0, idleT:0 };
 const dog = { x:player.x-18, y:player.y+4, face:"l", mode:"side", moving:false, frame:0, animT:0,
@@ -1213,32 +1243,6 @@ function tryAction(){
       care.growth += 2; checkGrowth(); markSave();
     }});
   }
-  /* わんちゃん：かんびょう or なでる */
-  {
-    const d = dist(player.x,player.y, dog.x,dog.y);
-    if(d < 45) cands.push({d:d*1.05, f:()=>{
-      if(care.sick && medCount > 0){
-        medCount--;
-        care.sick = false; care.sickT = 0; care.hungryT = 0; care.poopT = 0;
-        care.hunger = Math.max(care.hunger, 55);
-        jingle();
-        floatTexts.push({x:dog.x, y:dog.y-28, text:`${dName()}は げんきに なった！`, t:2.2});
-        dog.happyT = 2; dog.jumpT = 0.45;
-        for(let i=0;i<3;i++) hearts.push({x:dog.x+(Math.random()*20-10), y:dog.y-15-i*4, vy:-(21+Math.random()*15), life:1.3});
-        markSave();
-        return;
-      }
-      petCount++;
-      dog.happyT = 1.2; dog.sayT = 1.2; dog.jumpT = 0.45;
-      bark();
-      if(time - care.lastPetG > 30){ care.growth += 1; care.lastPetG = time; checkGrowth(); }
-      for(let i=0;i<3;i++){
-        hearts.push({x:dog.x+(Math.random()*20-10), y:dog.y-15-i*4,
-                     vy:-(21+Math.random()*15), life:1.2+i*0.15});
-      }
-      markSave();
-    }});
-  }
   /* つり */
   {
     const [dx,dy] = dirVec();
@@ -1251,10 +1255,38 @@ function tryAction(){
   if(cands.length){
     cands.sort((a,b)=>a.d-b.d);
     cands[0].f();
+  }
+}
+/* 🐾ボタン専用：わんこへのアクション（かんびょう / なでる / とおくなら よぶ） */
+function dogAction(){
+  if(dialog || race || farewell || fishing || mapOpen) return;
+  const d = dist(player.x, player.y, dog.x, dog.y);
+  if(d >= 50){
+    dog.comeT = 3;
+    floatTexts.push({x:player.x, y:player.y-26, text:`${dName()}、おいで！`, t:1.3});
+    sfx("triangle", 900, 0.09, 0.08, 1500);
+    setTimeout(()=>sfx("triangle", 1100, 0.12, 0.08, 700), 110);
     return;
   }
-  /* なにもなければ ボールあそび */
-  if(hasBall && ball.state==="none") throwBall();
+  if(care.sick && medCount > 0){
+    medCount--;
+    care.sick = false; care.sickT = 0; care.hungryT = 0; care.poopT = 0;
+    care.hunger = Math.max(care.hunger, 55);
+    jingle();
+    floatTexts.push({x:dog.x, y:dog.y-28, text:`${dName()}は げんきに なった！`, t:2.2});
+    dog.happyT = 2; dog.jumpT = 0.45;
+    for(let i=0;i<3;i++) hearts.push({x:dog.x+(Math.random()*20-10), y:dog.y-15-i*4, vy:-(21+Math.random()*15), life:1.3});
+    markSave();
+    return;
+  }
+  petCount++;
+  dog.happyT = 1.2; dog.sayT = 1.2; dog.jumpT = 0.45;
+  bark();
+  if(time - care.lastPetG > 30){ care.growth += 1; care.lastPetG = time; checkGrowth(); }
+  for(let i=0;i<3;i++){
+    hearts.push({x:dog.x+(Math.random()*20-10), y:dog.y-15-i*4, vy:-(21+Math.random()*15), life:1.2+i*0.15});
+  }
+  markSave();
 }
 
 /* ================= おみせ・ずかん（DOMパネル） ================= */
@@ -1431,7 +1463,7 @@ function openShop(){
       <button data-buy="ball" ${hasBall?"disabled":(bells>=500?"":"disabled")}>${hasBall?"かった！":"500ベル"}</button></div>
     <div class="row"><span class="nm">${icn("food","dogfood")}ドッグフード（10しょく）<br><small class="muted">🍖ボタン／Fキーで ごはんを あげよう</small></span>
       <button data-buy="food" ${bells>=300?"":"disabled"}>300ベル</button></div>
-    <div class="row"><span class="nm">${icn("care","kusuri")}おくすり<br><small class="muted">びょうきのとき ${dName()}を タップ</small></span>
+    <div class="row"><span class="nm">${icn("care","kusuri")}おくすり<br><small class="muted">びょうきのとき 🐾ボタンで あげる</small></span>
       <button data-buy="med" ${bells>=200?"":"disabled"}>200ベル</button></div>`;
   shopPanel.style.display = "block";
 }
@@ -1455,7 +1487,11 @@ shopPanel.addEventListener("click", e=>{
     }
     if(k==="b_red" && bells>=300){ bells-=300; bandana="#e0575f"; popSound(); }
     if(k==="b_blue" && bells>=300){ bells-=300; bandana="#5b8dd6"; popSound(); }
-    if(k==="ball" && !hasBall && bells>=500){ bells-=500; hasBall=true; jingle(); document.body.classList.add("hasball"); }
+    if(k==="ball" && !hasBall && bells>=500){
+      bells-=500; hasBall=true; jingle();
+      document.body.classList.add("hasball");
+      popup = { text:"🎾ボタンで ボールを なげよう！ むいている ほうに とぶよ", t:4.5 };
+    }
     if(k==="food" && bells>=300){ bells-=300; foodStock+=10; popSound(); updateFeedBtn(); }
     if(k==="med" && bells>=200){ bells-=200; medCount++; popSound(); }
     markSave(); openShop();
@@ -1501,6 +1537,15 @@ bookPanel.addEventListener("click", e=>{
 const feedBtn = document.getElementById("feedBtn");
 function updateFeedBtn(){ feedBtn.style.display = foodStock>0 ? "flex" : "none"; }
 feedBtn.addEventListener("click", ()=>feedDog());
+/* ちずボタン・わんこボタン */
+let mapOpen = false;
+const mapBtn = document.getElementById("mapBtn");
+mapBtn.addEventListener("click", ()=>{
+  if(farewell || race) return;
+  mapOpen = !mapOpen;
+  mapOpen ? uiOpen() : uiClose();
+});
+actBtn.addEventListener("click", ()=>dogAction());
 function dogSheet(){
   if(care.stage==="puppy" && SPR.dog_puppy) return SPR.dog_puppy;
   if(care.stage==="senior" && SPR.dog_senior) return SPR.dog_senior;
@@ -1610,6 +1655,7 @@ function update(dt){
     return;
   }
   if(race){ updateRace(dt); return; }
+  if(mapOpen) actPressed = false;   /* ちずを見ているあいだは アクションしない */
 
   if(actPressed){ tryAction(); actPressed = false; }
   updateCare(dt);
@@ -1700,7 +1746,23 @@ function update(dt){
   if(dog.sayT>0) dog.sayT -= dt;
   if(dog.jumpT>0) dog.jumpT -= dt;
   dog.moving = false;
-  if(ball.state==="fly" || ball.state==="ground"){
+  if(dog.comeT > 0 && ball.state === "none"){
+    /* よばれたので はしってくる */
+    dog.comeT -= dt;
+    const dx = player.x-dog.x, dy = player.y-dog.y, d = Math.hypot(dx,dy);
+    if(d > 26){
+      const dsp = 170*dt;
+      dog.x += dx/d*dsp; dog.y += dy/d*dsp;
+      dog.moving = true;
+      if(Math.abs(dx) > 1.5) dog.face = dx>0?"r":"l";
+      dog.mode = Math.abs(dx) > Math.abs(dy)*1.15 ? "side" : (dy>0 ? "down" : "up");
+      dog.animT += dt;
+      if(dog.animT>0.1){ dog.animT=0; dog.frame^=1; }
+    }else{
+      dog.comeT = 0; dog.happyT = 1;
+      trail.length = 0; lastTrail = {x:player.x, y:player.y};
+    }
+  }else if(ball.state==="fly" || ball.state==="ground"){
     /* ボールを おいかける！ */
     const dx = ball.x-dog.x, dy = ball.y-dog.y, d = Math.hypot(dx,dy);
     if(d > 7){
@@ -2600,6 +2662,7 @@ function drawUI(){
   uictx.clearRect(0,0,wpx,hpx);
   if(farewell){ drawFarewell(wpx, hpx); return; }
   if(race){ drawRaceUI(); return; }
+  if(mapOpen){ drawMinimap(wpx, hpx); return; }
   const psc = wpx / VW;           /* 位置変換用 */
   const sc = psc * 1.5;           /* 文字・ふきだしサイズ用（320px時代の基準を維持） */
   const W2S = (wx,wy)=>[(wx-cam.x)*psc, (wy-cam.y)*psc];
@@ -2651,10 +2714,10 @@ function drawUI(){
     const d = dist(player.x,player.y, dog.x,dog.y);
     if(care.sick && d < 60){
       const [sx,sy] = W2S(dog.x, dog.y-dogH);
-      bubble(sx, sy, medCount>0 ? "タップで おくすりを あげよう" : "おくすりが ひつよう…（商店で 200ベル）", sc);
+      bubble(sx, sy, medCount>0 ? "🐾ボタンで おくすりを あげよう" : "おくすりが ひつよう…（商店で 200ベル）", sc);
     }else if(d < 45 && !player.moving && player.idleT > 1.2 && ball.state==="none"){
       const [sx,sy] = W2S(dog.x, dog.y-dogH);
-      bubble(sx, sy, care.hunger<25 ? `${dName()}は おなかぺこぺこ…🍖` : `${dName()}を なでてね`, sc, true);
+      bubble(sx, sy, care.hunger<25 ? `${dName()}は おなかぺこぺこ…🍖` : `🐾ボタンで なでてね`, sc, true);
     }
   }
   if(fishing && fishing.state==="bite"){
@@ -2669,25 +2732,26 @@ function drawUI(){
     uictx.textAlign = "left";
   }
 
-  /* ポケット */
-  const fs = Math.max(11, 4.6*sc);
+  /* ポケット（スマホでは大きめ表示） */
+  const csc = sc * (VW===336 ? 1.5 : 1);
+  const fs = Math.max(11, 4.6*csc);
   uictx.font = `bold ${fs}px 'Hiragino Maru Gothic ProN', sans-serif`;
   const label = `🔔${bells}  🍎${pocket.apple}  🐟${sumInv(fishInv)}  🦋${sumInv(bugInv)}  🦴${pocket.fossil}  💗${petCount}`;
   const tw = uictx.measureText(label).width;
-  roundRect(uictx, 4*sc, 4*sc, tw+6*sc, 8.4*sc, 4.2*sc, "rgba(255,255,255,0.85)");
+  roundRect(uictx, 4*csc, 4*csc, tw+6*csc, 8.6*csc, 4.3*csc, "rgba(255,255,255,0.88)");
   uictx.fillStyle = "#c05577";
   uictx.textBaseline = "middle";
-  uictx.fillText(label, 7*sc, 8.4*sc);
+  uictx.fillText(label, 7*csc, 8.5*csc);
   /* おせわチップ */
   const stageTxt = ({puppy:"🐶こいぬ", adult:"🐕おとな", senior:"🎓シニア"})[care.stage] || "";
   const hungerIcon = care.hunger<25 ? "🍖⚠" : "🍖";
   const label2 = `${hungerIcon}${Math.round(care.hunger)}%  🥫${foodStock}  💊${medCount}  ${stageTxt}`;
-  const fs2 = Math.max(10, 4*sc);
+  const fs2 = Math.max(10, 4.2*csc);
   uictx.font = `bold ${fs2}px 'Hiragino Maru Gothic ProN', sans-serif`;
   const tw2 = uictx.measureText(label2).width;
-  roundRect(uictx, 4*sc, 13.6*sc, tw2+6*sc, 7.4*sc, 3.7*sc, "rgba(255,255,255,0.8)");
+  roundRect(uictx, 4*csc, 14*csc, tw2+6*csc, 7.8*csc, 3.9*csc, "rgba(255,255,255,0.84)");
   uictx.fillStyle = care.sick ? "#c0392b" : "#8a5f47";
-  uictx.fillText(label2, 7*sc, 17.4*sc);
+  uictx.fillText(label2, 7*csc, 18*csc);
 
   for(const f of floatTexts){
     const [sx,sy] = W2S(f.x, f.y);
@@ -2758,6 +2822,38 @@ function drawUI(){
       uictx.closePath(); uictx.fill();
     }
   }
+}
+function drawMinimap(wpx, hpx){
+  const sc = (wpx / VW) * 1.5;
+  const scl = Math.min((wpx*0.84)/MINI.width, (hpx*0.78)/MINI.height);
+  const mw = MINI.width*scl, mh = MINI.height*scl;
+  const mx = (wpx-mw)/2, my = (hpx-mh)/2 + hpx*0.015;
+  uictx.fillStyle = "rgba(40,30,45,0.6)";
+  uictx.fillRect(0, 0, wpx, hpx);
+  roundRect(uictx, mx-12, my-12, mw+24, mh+24, 16, "rgba(255,250,240,0.97)");
+  uictx.imageSmoothingEnabled = false;
+  uictx.drawImage(MINI, mx, my, mw, mh);
+  /* しせつ */
+  uictx.textAlign = "center"; uictx.textBaseline = "middle";
+  uictx.font = `${Math.max(14, mw*0.09)}px sans-serif`;
+  uictx.fillText("🫛", mx+(STALL.tx+1)*3*scl, my+(STALL.ty+0.5)*3*scl);
+  uictx.fillText("🏁", mx+(RACEGATE.tx+1.5)*3*scl, my+(RACEGATE.ty)*3*scl);
+  uictx.fillText("🎣", mx+19*3*scl, my+53*3*scl);
+  uictx.fillText("🌸", mx+7*3*scl, my+58*3*scl);
+  /* いまここ（点滅） */
+  const px = mx + (player.x/T)*3*scl, py = my + (player.y/T)*3*scl;
+  uictx.fillStyle = `rgba(255,60,90,${0.5+0.4*Math.abs(Math.sin(time*4))})`;
+  uictx.beginPath(); uictx.arc(px, py, 8+Math.sin(time*4)*2, 0, 7); uictx.fill();
+  uictx.fillStyle = "#fff";
+  uictx.beginPath(); uictx.arc(px, py, 4, 0, 7); uictx.fill();
+  /* タイトル */
+  uictx.font = `bold ${5.4*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+  uictx.fillStyle = "#7a4a2f";
+  uictx.fillText("🗺 まちの ちず", wpx/2, my - 22);
+  uictx.font = `${3.6*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+  uictx.fillStyle = "#bfa893";
+  uictx.fillText("タップで とじる", wpx/2, my + mh + 16);
+  uictx.textAlign = "left";
 }
 function drawFarewell(wpx, hpx){
   const sc = (wpx / VW) * 1.5;
@@ -2839,7 +2935,9 @@ window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundIte
   setBall:(v)=>{ hasBall = v; },
   setDayT:(t)=>{ dayOffset = t - (time % DAY_LEN); },
   openShop, toggleBook, openNamePanel, openRaceGate, startRace,
-  care, poops, feedDog, checkGrowth,
+  care, poops, feedDog, checkGrowth, dogAction,
+  toggleMap:()=>{ mapOpen = !mapOpen; },
+  get mapOpen(){ return mapOpen; },
   forceSick:()=>setSick(),
   forceFarewell:()=>startFarewell(),
   addFood:(n)=>{ foodStock+=n; updateFeedBtn(); },
