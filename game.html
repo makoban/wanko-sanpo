@@ -164,16 +164,28 @@
   body.touch .hint-sp{ display:block; }
   body.touch .hint-pc{ display:none; }
   @media (max-width:700px){
-    body{ padding:8px 6px 16px; }
-    h1{ font-size:22px; letter-spacing:.06em; }
-    .sub{ font-size:11px; margin-bottom:8px; letter-spacing:.08em; }
-    #frame{ padding:6px; border-radius:16px; width:min(96vw, 480px); }
-    #frame::before, #frame::after{ font-size:18px; top:-10px; }
+    /* スマホは 1画面に ぴったり収める（縦スクロールなし） */
+    html, body{ height:100dvh; overflow:hidden; }
+    body{ padding:4px 6px 0; }
+    h1{ margin-bottom:0; line-height:1; }
+    h1 img{ height:32px !important; }
+    .sub{ display:none; }
+    .hint{ display:none !important; }
+    #frame{
+      padding:5px; border-radius:14px;
+      width:min(96vw, 480px);
+    }
+    #frame::before, #frame::after{ font-size:16px; top:-9px; }
     #mute, #book{ width:38px; height:38px; font-size:16px; right:12px; }
     #mute{ top:12px; } #book{ top:56px; }
     #act{ width:56px; height:56px; font-size:26px; right:12px; bottom:12px; }
-    .hint{ font-size:11px; padding:7px 12px; margin-top:8px; line-height:1.7; }
+    #ballBtn{ right:12px; bottom:80px; width:48px; height:48px; }
+    #feedBtn{ right:12px; bottom:134px; width:48px; height:48px; }
     .panel{ font-size:13px; inset:4% 3%; }
+  }
+  @media (max-width:700px) and (max-height:540px){
+    /* よこもち */
+    #frame{ width:min(92vw, calc((100dvh - 48px) * 1.29)); }
   }
   .hint{
     margin-top:16px; color:#8a5f47; font-size:14px;
@@ -244,7 +256,16 @@ function fitUI(){
 }
 function applyViewport(){
   const portrait = window.innerHeight > window.innerWidth && window.innerWidth < 820;
-  const nVW = portrait ? 336 : 480, nVH = portrait ? 504 : 360;
+  let nVW, nVH;
+  if(portrait){
+    /* 画面の縦横比に合わせてキャンバスの縦を決める（余白なくフル表示） */
+    const stageW = Math.min(window.innerWidth*0.96, 480) - 10;
+    const availH = window.innerHeight - 56 - 10;
+    nVW = 336;
+    nVH = Math.max(400, Math.min(720, Math.round(336 * availH / stageW)));
+  }else{
+    nVW = 480; nVH = 360;
+  }
   if(nVW !== VW || nVH !== VH){
     VW = nVW; VH = nVH;
     cvs.width = VW; cvs.height = VH;
@@ -253,6 +274,16 @@ function applyViewport(){
   fitUI();
 }
 window.addEventListener("resize", applyViewport);
+window.addEventListener("orientationchange", applyViewport);
+if(window.visualViewport) window.visualViewport.addEventListener("resize", applyViewport);
+/* 保険：イベントが来ない環境でも サイズ変化を拾う */
+let lastWinW = 0, lastWinH = 0;
+setInterval(()=>{
+  if(window.innerWidth !== lastWinW || window.innerHeight !== lastWinH){
+    lastWinW = window.innerWidth; lastWinH = window.innerHeight;
+    applyViewport();
+  }
+}, 600);
 
 /* ================= 入力 ================= */
 const keys = {};
@@ -354,6 +385,11 @@ function touchEnd(e){
 }
 stage.addEventListener("touchend", touchEnd, {passive:false});
 stage.addEventListener("touchcancel", touchEnd, {passive:false});
+/* ページ全体のバウンス・スクロールを抑止（パネル内スクロールだけ許可） */
+document.body.addEventListener("touchmove", e=>{
+  if(e.target.closest(".panel")) return;
+  if(e.cancelable) e.preventDefault();
+}, {passive:false});
 
 /* ================= ユーティリティ ================= */
 function h32(x,y){
