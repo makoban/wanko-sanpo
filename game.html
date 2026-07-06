@@ -2966,8 +2966,10 @@ function drawDogIcon(){
 }
 function drawDog(){
   const jump = dog.jumpT>0 ? Math.round(Math.sin(dog.jumpT/0.45*Math.PI)*8) : 0;
-  /* ポーズ（びょうき・すやすや・ふせ） */
-  if(!dog.moving && ball.state==="none" && dog.jumpT<=0){
+  /* ポーズ（びょうき・すやすや・ふせ）※ポーズ絵はしば犬専用。
+     ほかの犬種は選んだ犬のシート絵のまま＋気持ちアイコンで表現 */
+  if(!dog.moving && ball.state==="none" && dog.jumpT<=0
+     && !(dogBreed !== "shiba" && SPR["dogb_"+dogBreed])){
     let pimg = null;
     if(care.sick && POSE.sick && POSE.sick.complete) pimg = POSE.sick;
     else if(dogIdleT > 30 && POSE.sleep && POSE.sleep.complete) pimg = POSE.sleep;
