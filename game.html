@@ -3263,24 +3263,51 @@ function drawWorld(){
   /* あたたかい光 → 時間で かわる */
   const vg = ctx.createRadialGradient(VW/2,VH/2, Math.min(VW,VH)*0.38, VW/2,VH/2, Math.max(VW,VH)*0.68);
   vg.addColorStop(0,"rgba(255,240,200,0)");
-  vg.addColorStop(1,"rgba(255,190,140,0.15)");
+  vg.addColorStop(1,"rgba(255,190,140,0.08)");
   ctx.fillStyle = vg; ctx.fillRect(0,0,VW,VH);
   if(phase.sun > 0){
-    ctx.fillStyle = `rgba(255,140,60,${0.18*phase.sun})`;
+    ctx.fillStyle = `rgba(255,140,60,${0.12*phase.sun})`;
     ctx.fillRect(0,0,VW,VH);
   }
   if(phase.night > 0){
-    /* 明るめの夜（スマホでも見やすく） */
-    ctx.fillStyle = `rgba(24,32,80,${0.26*phase.night})`;
-    ctx.fillRect(0,0,VW,VH);
+    /* 夜は「電気がつく」：暗がりから 街灯・家・ランタンの光をくり抜く */
+    if(!drawWorld._ncv) drawWorld._ncv = document.createElement("canvas");
+    const ncv = drawWorld._ncv;
+    if(ncv.width!==VW || ncv.height!==VH){ ncv.width=VW; ncv.height=VH; }
+    const nctx = ncv.getContext("2d");
+    nctx.globalCompositeOperation = "source-over";
+    nctx.clearRect(0,0,VW,VH);
+    nctx.fillStyle = `rgba(18,26,70,${0.34*phase.night})`;
+    nctx.fillRect(0,0,VW,VH);
+    nctx.globalCompositeOperation = "destination-out";
+    const hole = (wx,wy,r,st)=>{
+      const sx = wx-cam.x, sy = wy-cam.y;
+      if(sx<-r || sy<-r || sx>VW+r || sy>VH+r) return;
+      const g = nctx.createRadialGradient(sx,sy,r*0.12, sx,sy,r);
+      g.addColorStop(0, `rgba(0,0,0,${st})`);
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      nctx.fillStyle = g;
+      nctx.beginPath(); nctx.arc(sx,sy,r,0,7); nctx.fill();
+    };
+    hole(player.x, player.y, 95, 0.95);          /* おさんぽランタン（いつも自分のまわりは明るい） */
+    hole(dog.x, dog.y, 48, 0.7);
+    const kire0 = spiritTier()===0;
+    for(const l of lamps) hole(l[0]*T+12, l[1]*T-8, kire0?34:82, kire0?0.45:0.95);   /* 街灯 */
+    for(const h of houses) hole(h.tx*T+48, h.ty*T+62, 62, 0.55);                     /* 家のまど明かり */
+    hole(STALL.tx*T+24, STALL.ty*T+24, 56, 0.6);                                     /* 商店 */
+    for(const pf of placedFurn){
+      if(pf.n==="takibi") hole(pf.tx*T+12, pf.ty*T+12, 78, 0.95);                    /* たき火 */
+      if(pf.n==="tourou") hole(pf.tx*T+12, pf.ty*T+6, 46, 0.8);                      /* 石とうろう */
+    }
+    ctx.drawImage(ncv, 0, 0);
   }
-  /* 今日の天気 */
-  if(weather==="kumo"){
-    ctx.fillStyle = "rgba(120,130,150,0.06)"; ctx.fillRect(0,0,VW,VH);
-  }else if(weather==="kiri"){
-    ctx.fillStyle = "rgba(235,240,245,0.26)"; ctx.fillRect(0,0,VW,VH);
+  /* 今日の天気（夜とは重ねない） */
+  if(weather==="kumo" && phase.night < 0.5){
+    ctx.fillStyle = "rgba(120,130,150,0.05)"; ctx.fillRect(0,0,VW,VH);
+  }else if(weather==="kiri" && phase.night < 0.5){
+    ctx.fillStyle = "rgba(235,240,245,0.24)"; ctx.fillRect(0,0,VW,VH);
   }else if(weather==="ame"){
-    ctx.fillStyle = "rgba(80,100,140,0.14)"; ctx.fillRect(0,0,VW,VH);
+    ctx.fillStyle = `rgba(80,100,140,${phase.night>0.5 ? 0.05 : 0.12})`; ctx.fillRect(0,0,VW,VH);
     ctx.strokeStyle = "rgba(200,218,245,0.55)"; ctx.lineWidth = 1;
     ctx.beginPath();
     const tt = Math.floor(time*24);
