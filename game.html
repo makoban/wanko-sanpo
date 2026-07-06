@@ -804,6 +804,34 @@ function fashionImg(n){
 const accDef = ()=> FASHION_DEFS.find(f=>f[0]===accessory);
 const leashColor = ()=>{ const d = accDef(); return (d && d[3]==="lead") ? d[4] : "#c9575c"; };
 
+/* ================= 季節かざり＋今日の天気（v6） ================= */
+const MONTH_NOW = new Date().getMonth()+1;
+const SEASON_IMG = {};
+function seasonImg(n){
+  if(!SEASON_IMG[n]){ const im = new Image(); im.src = "sprites/items/seasonal/"+n+".png"; SEASON_IMG[n] = im; }
+  return SEASON_IMG[n];
+}
+/* 月ごとの広場のかざり */
+const MONTH_DECOR = {
+  1:[["kadomatsu",15.0,22.8],["kagamimochi",24.6,22.7]],
+  2:[["heart-balloon",24.6,22.5]],
+  5:[["koinobori",24.6,22.2]],
+  7:[["sasa",15.0,22.8],["furin",24.6,22.5]],
+  8:[["uchiwa",15.0,22.6],["senko",24.6,22.6]],
+  10:[["pumpkin",15.0,22.8],["obake",24.6,22.4]],
+  11:[["momiji",15.0,22.6],["icho",24.6,22.6]],
+  12:[["tree",19.7,23.0],["yukidaruma",15.0,22.9],["present",24.6,22.6]]
+};
+/* 天気：日づけで決まる（毎日かわる） */
+function hashStr(s){ let h=7; for(const c of s) h=(h*31 + c.charCodeAt(0))>>>0; return h; }
+let weather = (()=>{
+  const r = hashStr(new Date().toISOString().slice(0,10)) % 100;
+  let w = r < 45 ? "sun" : r < 70 ? "kumo" : r < 90 ? "ame" : "kiri";
+  if(w==="ame" && (MONTH_NOW===12 || MONTH_NOW<=2)) w = "yuki";
+  return w;
+})();
+const WEATHER_EMOJI = {sun:"☀️", kumo:"☁️", ame:"🌧", yuki:"❄️", kiri:"🌫"};
+
 /* ================= もちもの・セーブ ================= */
 let bells = 0, hasBall = false, bandana = null, petCount = 0;
 let playerName = "", dogName = "", raceWins = 0, dogBreed = "shiba";
@@ -1186,6 +1214,8 @@ function spawnBug(name){
     x:hx, y:hy, hx, hy, tx:hx, ty:hy, t:0, ph:Math.random()*6 });
 }
 function manageBugs(night){
+  /* 雨と雪の日は 虫はおやすみ */
+  if(weather==="ame" || weather==="yuki"){ bugs.length = 0; return; }
   const want = night
     ? ["ホタル","ホタル","ホタル","ホタル"]
     : ["モンシロチョウ","モンキチョウ","ピンクのチョウ","ミツバチ","トンボ","モンシロチョウ"];
@@ -1441,6 +1471,7 @@ function startDialog(v){
 }
 function startFishing(bx,by){
   fishing = { bx, by, sea: by >= 72*T, t:0, biteT:1.5+Math.random()*2.8, state:"wait", hookT:0 };
+  if(weather==="ame") fishing.biteT *= 0.55;   /* 雨の日は入れ食い */
   splash();
 }
 function endFishing(msg){
@@ -3100,6 +3131,16 @@ function drawWorld(){
     }});
   }
   for(const v of VILLAGERS){ if(vActive(v)) items.push({y:v.y+3, f:()=>drawVillager(v)}); }
+  /* 季節のかざり（今月ぶん） */
+  for(const [n,cx,by] of (MONTH_DECOR[MONTH_NOW]||[])){
+    items.push({y:by*T, f:()=>{
+      const im = seasonImg(n);
+      if(im.complete && im.naturalWidth){
+        const w = 26, h = Math.round(w*im.height/im.width);
+        ctx.drawImage(im, Math.round(cx*T-w/2), Math.round(by*T-h), w, h);
+      }
+    }});
+  }
   /* おいた家具 */
   for(const pf of placedFurn){
     items.push({y:(pf.ty+1)*T, f:()=>{
@@ -3177,6 +3218,30 @@ function drawWorld(){
   if(phase.night > 0){
     ctx.fillStyle = `rgba(20,28,75,${0.42*phase.night})`;
     ctx.fillRect(0,0,VW,VH);
+  }
+  /* 今日の天気 */
+  if(weather==="kumo"){
+    ctx.fillStyle = "rgba(120,130,150,0.10)"; ctx.fillRect(0,0,VW,VH);
+  }else if(weather==="kiri"){
+    ctx.fillStyle = "rgba(235,240,245,0.26)"; ctx.fillRect(0,0,VW,VH);
+  }else if(weather==="ame"){
+    ctx.fillStyle = "rgba(80,100,140,0.14)"; ctx.fillRect(0,0,VW,VH);
+    ctx.strokeStyle = "rgba(200,218,245,0.55)"; ctx.lineWidth = 1;
+    ctx.beginPath();
+    const tt = Math.floor(time*24);
+    for(let i=0;i<46;i++){
+      const rx = ((i*173 + tt*29) % (VW+40)) - 20;
+      const ry = ((i*97  + tt*53) % (VH+30)) - 15;
+      ctx.moveTo(rx, ry); ctx.lineTo(rx-3, ry+9);
+    }
+    ctx.stroke();
+  }else if(weather==="yuki"){
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    for(let i=0;i<34;i++){
+      const sy = ((i*127 + time*26 + i*i) % (VH+16)) - 8;
+      const sx = ((i*211) % VW) + Math.sin(time*1.2 + i)*8;
+      ctx.fillRect(Math.round(sx), Math.round(sy), 2, 2);
+    }
   }
 }
 function drawHeart(x,y,a){
@@ -3278,7 +3343,7 @@ function drawUI(){
   const stageTxt = ({puppy:"🐶子犬", adult:"🐕大人", senior:"🎓シニア"})[care.stage] || "";
   const hungerIcon = care.hunger<25 ? "🍖⚠" : "🍖";
   const spTxt = ["🌧どんより","⛅ふつう","🌼いきいき","✨きらきら"][spiritTier()];
-  const label2 = `${hungerIcon}${Math.round(care.hunger)}%  🥫${foodStock}  💊${medCount}  ${stageTxt}  ${spTxt}${Math.round(spirit)}`;
+  const label2 = `${WEATHER_EMOJI[weather]}  ${hungerIcon}${Math.round(care.hunger)}%  🥫${foodStock}  💊${medCount}  ${stageTxt}  ${spTxt}${Math.round(spirit)}`;
   const fs2 = Math.max(10, 4.2*csc);
   uictx.font = `bold ${fs2}px 'Hiragino Maru Gothic ProN', sans-serif`;
   const tw2 = uictx.measureText(label2).width;
@@ -3540,6 +3605,7 @@ window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundIte
   care, poops, feedDog, checkGrowth, dogAction, addCare, submitScore, fetchRank,
   spiritTier, setSpirit:(v)=>{ spirit = clamp(v,0,100); }, getSpirit:()=>spirit,
   setBreed:(b)=>{ dogBreed = b; }, getBreed:()=>dogBreed, DOG_BREEDS, openNamePanel,
+  setWeather:(w)=>{ weather = w; }, getWeather:()=>weather, placedFurn, furnInv, fashionOwned,
   get careScore(){ return careScore; },
   get rankInfo(){ return rankInfo; },
   toggleMap:()=>{ mapOpen = !mapOpen; },
