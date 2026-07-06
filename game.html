@@ -148,8 +148,8 @@
   }
   .panel .bells{ font-weight:bold; color:#c98b1e; }
   .panel .icn{
-    width:26px; height:26px; image-rendering:pixelated;
-    vertical-align:-7px; margin-right:7px;
+    width:40px; height:40px; image-rendering:pixelated;
+    vertical-align:-13px; margin-right:8px;
   }
   #namePanel{ inset:auto 8%; top:6%; z-index:30; max-height:86%; }
   /* 犬種えらび */
@@ -3004,8 +3004,8 @@ function drawDog(){
       }else if(ad[3]!=="lead"){
         const im = fashionImg(ad[0]);
         if(im.complete && im.naturalWidth){
-          const s = 16, bob = Math.round(Math.sin(time*2.2)*1);
-          ctx.drawImage(im, Math.round(dog.x - s/2), dy - s + 2 + bob, s, Math.round(s*im.height/im.width));
+          const s = 22, bob = Math.round(Math.sin(time*2.2)*1);
+          ctx.drawImage(im, Math.round(dog.x - s/2), dy - s + 4 + bob, s, Math.round(s*im.height/im.width));
         }
       }
     }
@@ -3540,7 +3540,7 @@ function drawMinimap(wpx, hpx){
   uictx.drawImage(MINI, mx, my, mw, mh);
   /* しせつ */
   uictx.textAlign = "center"; uictx.textBaseline = "middle";
-  uictx.font = `${Math.max(14, mw*0.09)}px sans-serif`;
+  uictx.font = `${Math.max(20, mw*0.13)}px sans-serif`;
   uictx.fillText("🫛", mx+(STALL.tx+1)*3*scl, my+(STALL.ty+0.5)*3*scl);
   uictx.fillText("🏁", mx+(RACEGATE.tx+1.5)*3*scl, my+(RACEGATE.ty)*3*scl);
   uictx.fillText("🎣", mx+40*3*scl, my+114*3*scl);
