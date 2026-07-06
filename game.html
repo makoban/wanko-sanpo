@@ -285,7 +285,7 @@
 <script>
 "use strict";
 /* ================= 基本セットアップ ================= */
-const T = 24, MW = 40, MH = 78;      /* おおきな縦長の街＋みなみの海（48pxキャラ・1.5倍スケール） */
+const T = 24, MW = 80, MH = 192;     /* 5倍のひろさの街（森・広場・果樹園・大きな湖・海） */
 let VW = 320, VH = 240;
 const cvs = document.getElementById("game");
 const ctx = cvs.getContext("2d");
@@ -813,14 +813,14 @@ function seasonImg(n){
 }
 /* 月ごとの広場のかざり */
 const MONTH_DECOR = {
-  1:[["kadomatsu",15.0,22.8],["kagamimochi",24.6,22.7]],
-  2:[["heart-balloon",24.6,22.5]],
-  5:[["koinobori",24.6,22.2]],
-  7:[["sasa",15.0,22.8],["furin",24.6,22.5]],
-  8:[["uchiwa",15.0,22.6],["senko",24.6,22.6]],
-  10:[["pumpkin",15.0,22.8],["obake",24.6,22.4]],
-  11:[["momiji",15.0,22.6],["icho",24.6,22.6]],
-  12:[["tree",19.7,23.0],["yukidaruma",15.0,22.9],["present",24.6,22.6]]
+  1:[["kadomatsu",31.0,49.8],["kagamimochi",49.0,49.7]],
+  2:[["heart-balloon",49.0,49.5]],
+  5:[["koinobori",49.0,49.2]],
+  7:[["sasa",31.0,49.8],["furin",49.0,49.5]],
+  8:[["uchiwa",31.0,49.6],["senko",49.0,49.6]],
+  10:[["pumpkin",31.0,49.8],["obake",49.0,49.4]],
+  11:[["momiji",31.0,49.6],["icho",49.0,49.6]],
+  12:[["tree",39.7,50.2],["yukidaruma",31.0,49.9],["present",49.0,49.6]]
 };
 /* 天気：日づけで決まる（毎日かわる） */
 function hashStr(s){ let h=7; for(const c of s) h=(h*31 + c.charCodeAt(0))>>>0; return h; }
@@ -902,7 +902,7 @@ const pocket = { apple:0, fossil:0 };
 const fishInv = {}, bugInv = {};
 const caughtFish = new Set(), caughtBug = new Set();
 let saveDirty = false, saveTimer = 0;
-const SAVE_KEY = "wanko-sanpo-save-v1";
+const SAVE_KEY = "wanko-sanpo-save-v2";   /* 大きな街リニューアルで全員はじめから */
 function markSave(){ saveDirty = true; }
 function doSave(){
   try{
@@ -963,64 +963,73 @@ function loadSave(){
 }
 const sumInv = inv => Object.values(inv).reduce((a,b)=>a+b,0);
 
-/* ================= マップ生成（40×64の大きな街） ================= */
+/* ================= マップ生成（80×192・5倍のひろさ） =================
+   きた→みなみ：大きな森 / おうちどおり / ふんすい広場 / 公園 /
+   果樹園とはらっぱ / 大きな湖 / 丘とひみつの花畑 / すなはま / 海 */
 const ground = [], solid = [];
 for(let y=0;y<MH;y++){ ground.push(new Array(MW).fill("g")); solid.push(new Array(MW).fill(false)); }
 function setPath(x,y){ if(x>=0&&y>=0&&x<MW&&y<MH && ground[y][x]!=="w") ground[y][x]="p"; }
 
 /* みち */
-for(let y=13;y<61;y++){ setPath(19,y); setPath(20,y); }        /* メインストリート（たて） */
-for(let x=2;x<38;x++){ setPath(x,13); setPath(x,14); }         /* 森のさかいめ */
-for(let x=3;x<37;x++){ setPath(x,20); setPath(x,21); }         /* おうちどおり */
-for(let y=22;y<28;y++) for(let x=14;x<26;x++) setPath(x,y);    /* ふんすい広場 */
-for(let x=2;x<38;x++){ setPath(x,33); setPath(x,34); }         /* こうえんどおり */
-for(let x=2;x<32;x++){ setPath(x,46); setPath(x,47); }         /* みずうみどおり */
-for(let y=48;y<54;y++){ setPath(15,y); setPath(16,y); }        /* さんばしへ */
-for(let y=48;y<56;y++){ setPath(6,y); setPath(7,y); }          /* ひみつのはなばたけへ */
-for(let y=61;y<70;y++){ setPath(19,y); setPath(20,y); }        /* すなはまへ */
+for(let x=4;x<77;x++){ setPath(x,31); setPath(x,32); }         /* 森のさかいめ */
+for(let y=31;y<111;y++){ setPath(39,y); setPath(40,y); }       /* メインストリート（きた） */
+for(let y=134;y<158;y++){ setPath(39,y); setPath(40,y); }      /* メインストリート（みなみ・浜へ） */
+for(let x=4;x<77;x++){ setPath(x,44); setPath(x,45); }         /* おうちどおり */
+for(let y=48;y<62;y++) for(let x=28;x<53;x++) setPath(x,y);    /* ふんすい広場 */
+for(let x=4;x<77;x++){ setPath(x,62); setPath(x,63); }         /* こうえんどおり */
+for(let x=4;x<77;x++){ setPath(x,88); setPath(x,89); }         /* まんなかどおり */
+for(let x=4;x<67;x++){ setPath(x,108); setPath(x,109); }       /* みずうみどおり */
+for(let y=32;y<142;y++){ setPath(10,y); setPath(11,y); }       /* にしのこみち */
+for(let y=32;y<110;y++){ setPath(68,y); setPath(69,y); }       /* ひがしのこみち */
+for(let x=24;x<59;x++){ setPath(x,134); setPath(x,135); }      /* みずうみ南どおり */
+for(let x=10;x<41;x++){ setPath(x,140); setPath(x,141); }      /* はなばたけどおり */
+for(let y=120;y<135;y++){ setPath(24,y); setPath(25,y); }      /* 湖の西まわり */
+for(let y=109;y<135;y++){ setPath(62,y); setPath(63,y); }      /* 湖の東まわり */
 
-/* みずうみ */
-const POND = { cx:25, cy:54, rx:8.5, ry:5 };
+/* おおきな みずうみ */
+const POND = { cx:40, cy:122, rx:17, ry:11 };
 for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){
   const dx=(x-POND.cx)/POND.rx, dy=(y-POND.cy)/POND.ry;
   if(dx*dx+dy*dy<=1){ ground[y][x]="w"; solid[y][x]=true; }
 }
 /* さんばし（みずうみに つきでた 木のみち） */
-for(let x=17;x<22;x++){ ground[53][x]="d"; solid[53][x]=false; }
+for(let y=111;y<117;y++){ ground[y][39]="d"; ground[y][40]="d"; solid[y][39]=false; solid[y][40]=false; }
 
-/* おはな */
-for(const fx of [4,9,15,24,30,35]){
-  for(const fy of [12,15,32,35]){
+/* おはな（たんぽぽスポット） */
+for(const fx of [6,14,22,30,48,56,64,72]){
+  for(const fy of [28,34,64,66,90,92,112,118]){
     if(fy<MH && ground[fy][fx]==="g") ground[fy][fx]="f";
   }
 }
-for(let y=37;y<40;y++) for(let x=8;x<13;x++) if(ground[y][x]==="g") ground[y][x]="f";   /* 花だんA */
-for(let y=40;y<43;y++) for(let x=27;x<32;x++) if(ground[y][x]==="g") ground[y][x]="f";  /* 花だんB */
-for(let x=24;x<29;x++) if(ground[48][x]==="g") ground[48][x]="f";                        /* みずべ */
-/* ひみつのはなばたけ */
-for(let y=56;y<61;y++) for(let x=3;x<11;x++) if(ground[y][x]==="g") ground[y][x]="f";
+for(let y=68;y<73;y++) for(let x=14;x<23;x++) if(ground[y][x]==="g") ground[y][x]="f";   /* 花だんA */
+for(let y=74;y<79;y++) for(let x=56;x<65;x++) if(ground[y][x]==="g") ground[y][x]="f";   /* 花だんB */
+for(let x=32;x<49;x++) if(ground[110][x]==="g") ground[110][x]="f";                       /* みずべ */
+/* ひみつのはなばたけ（にしの おく） */
+for(let y=142;y<149;y++) for(let x=4;x<19;x++) if(ground[y][x]==="g") ground[y][x]="f";
 
 /* うみ（みなみ）：すなはま＋うみ */
-for(let y=69;y<73;y++) for(let x=1;x<MW-1;x++) if(ground[y][x]==="g") ground[y][x]="p";  /* すなはま */
-for(let y=73;y<MH;y++) for(let x=0;x<MW;x++){ ground[y][x]="w"; solid[y][x]=true; }
+for(let y=156;y<166;y++) for(let x=1;x<MW-1;x++) if(ground[y][x]==="g") ground[y][x]="p";  /* すなはま */
+for(let y=166;y<MH;y++) for(let x=0;x<MW;x++){ ground[y][x]="w"; solid[y][x]=true; }
 
-/* おうち（4けん） */
+/* おうち（6けん） */
 const houses = [
-  {tx:4,  ty:16, roof:"#e0575f", roofD:"#b8404c", img:"house-red"},
-  {tx:11, ty:16, roof:"#5b8dd6", roofD:"#4470b0", img:"house-blue"},
-  {tx:25, ty:16, roof:"#5fae6e", roofD:"#478a56", img:"house-green"},
-  {tx:32, ty:16, roof:"#e8a54e", roofD:"#c48435", img:"house-yellow"}
+  {tx:6,  ty:35, roof:"#e0575f", roofD:"#b8404c", img:"house-red"},
+  {tx:15, ty:35, roof:"#5b8dd6", roofD:"#4470b0", img:"house-blue"},
+  {tx:24, ty:35, roof:"#5fae6e", roofD:"#478a56", img:"house-green"},
+  {tx:52, ty:35, roof:"#e8a54e", roofD:"#c48435", img:"house-yellow"},
+  {tx:61, ty:35, roof:"#5b8dd6", roofD:"#4470b0", img:"house-blue"},
+  {tx:70, ty:35, roof:"#5fae6e", roofD:"#478a56", img:"house-green"}
 ];
 for(const h of houses){
   for(let y=h.ty+2;y<h.ty+4;y++) for(let x=h.tx;x<h.tx+4;x++) solid[y][x]=true;
 }
 /* ふんすい（広場のまんなか） */
-const FOUNTAIN = { tx:18, ty:23, tw:4, th:4 };
+const FOUNTAIN = { tx:38, ty:52, tw:4, th:4 };
 for(let y=FOUNTAIN.ty;y<FOUNTAIN.ty+FOUNTAIN.th;y++)
   for(let x=FOUNTAIN.tx;x<FOUNTAIN.tx+FOUNTAIN.tw;x++) solid[y][x]=true;
 /* おみせ（そらまめ商店） */
-const STALL = { tx:26, ty:23 };
-solid[23][26]=true; solid[23][27]=true; solid[24][26]=true; solid[24][27]=true;
+const STALL = { tx:46, ty:50 };
+solid[50][46]=true; solid[50][47]=true; solid[51][46]=true; solid[51][47]=true;
 
 /* き */
 const trees = [];
@@ -1030,35 +1039,45 @@ function addTree(tx,ty,cherry){
   trees.push({tx,ty,cherry:!!cherry, fruit:false, fruitN:0, regrowT:0, shakeT:0, pendingDrop:0});
   solid[ty][tx]=true;
 }
-for(let x=2;x<38;x+=3) addTree(x,1);
-for(let x=3;x<38;x+=3) addTree(x,62);
-for(let y=4;y<61;y+=3){ addTree(1,y); addTree(38,y); }
-/* うみエリアの ふち＋はまべの木 */
-for(let y=64;y<72;y+=3){ addTree(1,y); addTree(38,y); }
-[[5,65],[12,64],[27,65],[34,64]].forEach(p=>addTree(p[0],p[1]));
-/* 森（きた） */
-[[4,4],[8,6],[13,4],[17,7],[23,5],[28,8],[33,4],[36,8],[6,10],[11,9],[26,10],[31,11],[16,10],[21,9]]
+/* まわりの木のかべ */
+for(let x=2;x<78;x+=3) addTree(x,1);
+for(let y=4;y<154;y+=3){ addTree(1,y); addTree(78,y); }
+/* おおきな森（きた） */
+[[6,5],[12,8],[18,4],[24,9],[30,6],[36,10],[44,5],[50,9],[56,6],[62,11],[70,7],[74,4],
+ [8,14],[16,18],[26,15],[34,20],[46,16],[54,21],[64,17],[72,23],[12,26],[28,24],[42,27],[58,26],[70,28],
+ [22,12],[38,14],[50,25],[6,22],[66,13]]
   .forEach(p=>addTree(p[0],p[1]));
-/* まちなか・こうえん */
-[[9,17],[22,17],[36,25],[3,29],[6,38],[31,38],[12,50],[34,10],[24,37],[35,42]]
+/* まちなか */
+[[13,37],[28,37],[57,37],[74,37],[8,50],[20,56],[60,50],[70,56],[6,60],[30,66],[52,66],[74,60]]
   .forEach(p=>addTree(p[0],p[1]));
-/* さくら */
-[[10,11],[13,37],[27,36],[3,56],[10,56],[3,60],[9,60]].forEach(p=>addTree(p[0],p[1],true));
-/* りんごの木 */
-const FRUIT_SPOTS = new Set(["8,6","28,8","34,10","6,38","31,38","12,50"]);
+/* こうえん・はらっぱ */
+[[8,76],[26,80],[48,78],[66,82],[14,86],[36,84],[58,86],[72,80],[48,94],[56,96],[64,92],[72,96],[50,102],[60,100],[70,104]]
+  .forEach(p=>addTree(p[0],p[1]));
+/* すなはまの木 */
+[[8,152],[20,150],[56,150],[70,152],[30,148],[50,148]].forEach(p=>addTree(p[0],p[1]));
+/* さくら（湖のまわり・公園） */
+[[24,112],[30,110],[50,110],[56,112],[20,130],[60,130],[16,120],[66,120],[12,66],[68,66]]
+  .forEach(p=>addTree(p[0],p[1],true));
+/* りんごの果樹園（にし） */
+const FRUIT_SPOTS = new Set();
+for(const fx of [8,14,20,28]) for(const fy of [94,100]){
+  addTree(fx,fy); FRUIT_SPOTS.add(fx+","+fy);
+}
 for(const tr of trees){
   if(FRUIT_SPOTS.has(tr.tx+","+tr.ty)){ tr.fruit = true; tr.fruitN = 3; }
 }
 
-const bushes = [[2,12],[37,12],[3,22],[36,22],[2,45],[31,45],[13,28],[27,29],[36,49]];
+const bushes = [[4,33],[76,33],[27,48],[53,48],[27,61],[53,61],[4,64],[76,64],
+  [12,90],[68,90],[22,136],[58,136],[36,150],[44,150],[4,110],[66,111]];
 bushes.forEach(b=>{ if(!solid[b[1]][b[0]] && ground[b[1]][b[0]]!=="p" && ground[b[1]][b[0]]!=="w"){ solid[b[1]][b[0]]=true; } });
-const benches = [{tx:16,ty:22},{tx:22,ty:35}];
+const benches = [{tx:32,ty:49},{tx:44,ty:58},{tx:20,ty:70},{tx:58,ty:118}];
 for(const b of benches){ solid[b.ty][b.tx]=true; solid[b.ty][b.tx+1]=true; }
-const lamps = [[13,22],[26,22],[13,27],[26,27],[9,19],[30,19],[10,32],[29,35],[14,48],[5,55]];
+const lamps = [[33,48],[46,48],[33,59],[46,59],[13,44],[66,44],[24,62],[56,62],
+  [38,90],[8,110],[70,110],[36,155],[44,155],[12,64],[38,136]];
 lamps.forEach(l=>{ if(!solid[l[1]][l[0]]) solid[l[1]][l[0]]=true; });
 /* ドッグレースじょうの ゲート（こうえんの ひがし） */
-const RACEGATE = { tx:34, ty:37 };
-solid[37][34]=true; solid[37][35]=true; solid[37][36]=true;
+const RACEGATE = { tx:64, ty:70 };
+solid[70][64]=true; solid[70][65]=true; solid[70][66]=true;
 
 /* ミニマップ（地形を1回だけ描いておく） */
 let MINI = null;
@@ -1080,7 +1099,7 @@ function buildMinimap(){
 buildMinimap();
 
 /* ================= キャラクター ================= */
-const player = { x:19.6*T, y:29.5*T, dir:"down", moving:false, frame:0, animT:0, idleT:0 };
+const player = { x:39.6*T, y:58.5*T, dir:"down", moving:false, frame:0, animT:0, idleT:0 };
 const dog = { x:player.x-18, y:player.y+4, face:"l", mode:"side", moving:false, frame:0, animT:0,
               happyT:0, wagPhase:0, sayT:0, jumpT:0 };
 const trail = [];
@@ -1090,78 +1109,78 @@ const ball = { state:"none", x:0, y:0, vx:0, vy:0, z:0, vz:0 };
 const VILLAGERS = [
   { name:"モカ", key:"moka", tag:"#c98b4e",
     img: makeVillager(HEAD_BEAR, {s:"#b48a5a", m:"#e0c39a", T:"#e0575f", t:"#f2888e"}),
-    hx:16.5*T, hy:25.5*T, pitch:300,
+    hx:33.5*T, hy:52.5*T, pitch:300,
     lines:["やあ！ 今日もいい天気だべあ〜","ふんすいの音、落ち着くべあ…","はちみつトースト食べたいべあ… じゅるり"] },
   { name:"ミケ", key:"mike", tag:"#e8a24e",
     img: makeVillager(HEAD_CAT, {s:"#f2b264", T:"#4f9c3d", t:"#6fbf5b"}),
-    hx:23*T, hy:26*T, pitch:680,
+    hx:45.5*T, hy:53.5*T, pitch:680,
     lines:["ひなたでお昼ねするのが好きなのにゃ〜","お魚をつったら見せてほしいにゃん！","この町、広くなったよね〜にゃ"] },
   { name:"ケロた", key:"kerota", tag:"#5daf3f",
     img: makeVillager(HEAD_FROG, {s:"#8fd06c", T:"#ffd166", t:"#ffe08c"}),
-    hx:15.5*T, hy:50.5*T, pitch:460,
+    hx:36.5*T, hy:110.5*T, pitch:460,
     lines:["さんばしで、つりができるケロ！","湖は広くて気持ちいいケロ〜","夜になるとホタルが飛ぶケロ！"] },
   { name:"ペンタ", key:"penta", tag:"#5b8dd6",
     img: makeVillager(HEAD_PENGUIN, {s:"#6b9bd0", n:"#f0a050", T:"#e0575f", t:"#ffffff"}),
-    hx:25*T, hy:60.3*T, pitch:560,
+    hx:44.5*T, hy:134.6*T, pitch:560,
     lines:["湖の南側は静かでいいペン","ニシキゴイがつれたら見せてペン！","いつか海も見てみたいペン〜"] },
   { name:"トンこ", key:"tonko", tag:"#e88ba8",
     img: makeVillager(HEAD_PIG, {s:"#f5b8c9", m:"#fac9d6", T:"#5b8dd6", t:"#7fabe0"}),
-    hx:28.5*T, hy:41.5*T, pitch:620,
+    hx:57.5*T, hy:75.5*T, pitch:620,
     lines:["お花畑のにおい、幸せぶひ〜","公園のお花、育てたのぶひ！","キラキラの場所、ほるといい事あるぶひ"] },
   { name:"メエこ", key:"meeko", tag:"#b48ee0",
     img: makeVillager(HEAD_SHEEP, {s:"#f7f0dd", m:"#e8c39a", T:"#c58bf2", t:"#d8aef7"}),
-    hx:27.6*T, hy:27.6*T, pitch:520,
+    hx:47.6*T, hy:57.6*T, pitch:520,
     lines:["そらまめ商店でお買い物した？ メェ","ベンチでひなたぼっこ、最高メェ","新しいバンダナ、わんちゃんに似合いそうメェ！"] },
   { name:"ミミィ", key:"mimii", tag:"#f088a8",
     img: makeVillager(HEAD_RABBIT, {s:"#ffffff", T:"#ff8fae", t:"#ffc2d6"}),
-    hx:10.5*T, hy:38.5*T, pitch:760,
+    hx:17.5*T, hy:69.5*T, pitch:760,
     lines:["この花だん、毎日水やりしてるの！","ぴょんぴょん競走しない？","チョウチョがいっぱいでうれしいな〜"] },
   { name:"ノロん", key:"noron", tag:"#a8763e",
     img: makeVillager(HEAD_DEER, {s:"#d9a066", m:"#f2d8b0", k:"#8a5a3a", T:"#3f6d6a", t:"#5f8d8a"}),
-    hx:14*T, hy:7.5*T, pitch:400,
+    hx:30.5*T, hy:8.5*T, pitch:400,
     lines:["湖の西に、ひみつのお花畑があるんだ","森は静かで落ち着くなあ","ツノ、ちょっとじまんなんだ"] },
   /* v7：きらきらの まちにだけ あそびにくる おきゃくさま */
   { name:"ポッポさん", key:"poppo", tag:"#8a93a3", tourist:true,
     img: makeVillager(HEAD_BEAR, {s:"#9aa3b0", m:"#c3ccd8", T:"#b8646a", t:"#d08a90"}),
-    hx:21.5*T, hy:22.5*T, pitch:360,
+    hx:42.5*T, hy:49.6*T, pitch:360,
     lines:["旅のとちゅうに寄ってみたんだ。にぎやかでいい町だねえ","この町のうわさ、となり町まで聞こえてるよ！","お花のかおりがする町は、いい町なんだ"] },
   { name:"ビーちゃん", key:"beechan", tag:"#e8b93e", tourist:true,
     img: makeVillager(HEAD_BEAR, {s:"#ffd95e", m:"#fff0b8", T:"#8a5a3a", t:"#b58a5a"}),
-    hx:17.5*T, hy:27.5*T, pitch:700,
+    hx:36.5*T, hy:54.5*T, pitch:700,
     lines:["はちみつ、いかが〜？ …なんてね、今日は遊びに来たの♪","お花がいっぱいだから、ミツバチもうれしいの","元気な町には、あまーいかおりがするのよ〜"] }
 ];
 /* v6：新住民30体（町の元気度が上がると 引っこしてくる） */
 const NEWCOMERS = [
- ["konta","こんた","#d98a3e",35, 5.5,7.5, 430,["こんこん！ 引っこしてきた、きつねのこんただよ","森のきのみのかくし場所、教えてあげようか？","しっぽ、ふさふさでしょ？ じまんなんだ"]],
- ["ririsu","りりす","#c47a4a",38, 14.5,8.5, 740,["どんぐり集めがとくいなの！","ほっぺに木の実、つめすぎちゃった…","木のぼりなら まけないよ〜！"]],
- ["ponkichi","ぽん吉","#8a6a4a",40, 26.5,31.5, 380,["ぽんぽこ〜！ にぎやかな町だなあ","たぬきねいり？ してないしてない！","おなかを たたくと いい音がするんだ"]],
- ["chuta","チュー太","#9a9aa8",42, 29.5,19.2, 800,["チューっす！ ぼく、ちいさいけど元気！","チーズより きのみが好きなんだ","小さいから、みんなの足もとに 注意してね！"]],
- ["hamujiro","ハム次郎","#e8b060",44, 34.5,21.4, 720,["ほっぺの ふくろに おやつが入ってるんだ","まわし車より お散歩のほうが 好きだなあ","ひまわりのタネ、いっしょに食べる？"]],
- ["poniko","ぽに子","#d88aa8",46, 8.5,19.2, 540,["パッカパッカ♪ 走ると気持ちいいね！","たてがみ、といてきたの。にあう？","ドッグレース、いつも応えんしてるよ！"]],
- ["meemee","メエメエ","#b8c8d8",48, 6.5,25.5, 500,["メエ〜。ふわふわの毛が じまんなの","春になったら 毛がりの季節ね","くさはらの草、おいしいのよ〜"]],
- ["mogurin","もぐりん","#7a5a48",50, 9.5,35.5, 350,["土の中から こんにちは！","キラキラのばしょ、地下でつながってるんだよ","おひさま、まぶしいなあ…"]],
- ["kawacchi","かわっち","#8a7a5a",52, 29.5,48.6, 620,["湖でぷかぷかするの、大好き！","貝を割るの、とくいなんだ〜","いっしょに 泳がない？ …犬かきで！"]],
- ["ga-ko","がーこ","#e8d048",54, 33.5,51.5, 580,["があがあ！ 水べは いいねえ","アヒルじゃないよ、がーこだよ","雨の日は テンションあがっちゃう！"]],
- ["harry","ハリー","#a88a6a",60, 9.5,11.5, 460,["ハリネズミのハリーだよ。チクチクしてごめんね","まるまるのが とくいなんだ","こわがらないで。なでるときは そーっとね"]],
- ["ho-chan","ほーちゃん","#8a7a9a",62, 22.5,6.5, 320,["ホーホー。夜の見回りは まかせて","昼間は ねむいんだ…ふぁ…","星空って いいよね。夜も遊びにおいで"]],
- ["koaran","こあらん","#9aa8b8",64, 12.5,30.5, 480,["ユーカリ…はないけど、この町の木も好き","だっこ、してあげようか？","おひるね 20時間は ふつうだよ？"]],
- ["mo-san","モーさん","#c8b8a8",66, 33.5,29.5, 300,["モ〜。のんびりが いちばんだねえ","牛にゅう、毎日飲んでる？","広場の草、たべていいのかな…だめ？"]],
- ["pakarun","ぱかるん","#e0d0b8",68, 24.5,38.5, 560,["ふわっふわの毛、さわってみる？","アルパカのつば、飛ばさないから安心して","高いところ、けっこう平気なんだ"]],
- ["rakkosuke","ラッコすけ","#8a7a6a",70, 11.5,51.5, 600,["湖にぷかー。貝をコンコン","おなかの上が ぼくのテーブル","手をつないで ねるんだよ。流されないように"]],
- ["kamekichi","カメ吉","#7aa86a",72, 26.5,60.5, 280,["のんびり行こう。それがコツじゃ","こう見えて 100さいなんじゃよ","こうらは たたかないでおくれ〜"]],
- ["inkochan","いんこちゃん","#e86a8a",74, 10.5,66.5, 780,["マネっこ とくいだよ！『おさんぽ びより！』","海の風、気持ちいいね〜","おしゃべり、とまらなくなっちゃう！"]],
- ["kuroe","クロエ","#5a5a6a",76, 15.6,19.4, 660,["ふふ。黒ねこは 幸運のしるしよ","夜にすれちがっても おどろかないでね","ミケとは なかよしなの"]],
- ["flamie","フラミー","#f088a0",78, 30.5,40.5, 640,["片足で立つの、つかれないよ？","ピンクの羽、お花畑と おそろい♪","バランスかんかく、きたえてるの"]],
- ["sarumon","サルもん","#b87a5a",80, 3.5,36.5, 520,["ウッキー！ 木のぼり competition する？","バナナがあったら 教えて！","かたたたき、してあげよっか？"]],
- ["kumagoro","くま五郎","#8a6a4a",82, 16.5,37.5, 340,["はちみつは モカと はんぶんこ","ふゆごもりの まえに いっぱい遊ぼう","この町、あったかくて ねむくなるなあ"]],
- ["ookamin","おおかみん","#7a8a9a",84, 33.5,6.5, 400,["がおー！ …おどろいた？ ごめんごめん","月の夜は とおぼえしたくなるんだ","森のパトロールは まかせて"]],
- ["paopao","ぱおぱお","#a8b8a8",86, 23.5,29.5, 360,["ぱおーん！ 白黒もようが チャームポイント","ささのは、ぽりぽり…あ、見てた？","ごろごろするの、とくいだよ"]],
- ["toranosuke","とらのすけ","#e8a048",88, 5.5,42.5, 380,["がるる…なんてね。やさしいトラだよ","しまもよう、かっこいいでしょ？","ひなたぼっこは トラの特けんだ"]],
- ["zo-san","ゾーさん","#9aa8b8",90, 27.5,67.5, 260,["長い鼻で 水あそび！ 海はさいこう！","背中に乗せてあげたいなあ","鼻で あくしゅ しよう！"]],
- ["kabao","カバ夫","#a89ab8",91, 35.5,56.5, 300,["大きな口、あーん！","水の中なら 身が軽いんだ","あくびじゃないよ、あいさつだよ"]],
- ["waniwani","ワニワニ","#7a9a6a",92, 32.5,59.5, 340,["ガブッ！…なんて しないから安心して","日なたで じっとするの 好きなんだ","なみだは 出るけど かなしくないよ"]],
- ["lionmaru","ライオン丸","#d8a048",94, 33.5,44.5, 320,["百じゅうの王…だけど、この町では のんびり屋","たてがみの 手入れ、たいへんなんだぞ","ガオーの練習、聞いてくれる？"]],
- ["komorin","こもりん","#8a7aa8",95, 35.5,10.5, 700,["さかさまから こんにちは！","夜行せいだけど、みんなに会いたくて…","はねで つつむと あったかいんだよ"]]
+ ["konta","こんた","#d98a3e",35, 10.5,12.5, 430,["こんこん！ 引っこしてきた、きつねのこんただよ","森のきのみのかくし場所、教えてあげようか？","しっぽ、ふさふさでしょ？ じまんなんだ"]],
+ ["ririsu","りりす","#c47a4a",38, 22.5,14.5, 740,["どんぐり集めがとくいなの！","ほっぺに木の実、つめすぎちゃった…","木のぼりなら まけないよ〜！"]],
+ ["ponkichi","ぽん吉","#8a6a4a",40, 50.5,67.5, 380,["ぽんぽこ〜！ にぎやかな町だなあ","たぬきねいり？ してないしてない！","おなかを たたくと いい音がするんだ"]],
+ ["chuta","チュー太","#9a9aa8",42, 58.5,44.6, 800,["チューっす！ ぼく、ちいさいけど元気！","チーズより きのみが好きなんだ","小さいから、みんなの足もとに 注意してね！"]],
+ ["hamujiro","ハム次郎","#e8b060",44, 73.5,44.6, 720,["ほっぺの ふくろに おやつが入ってるんだ","まわし車より お散歩のほうが 好きだなあ","ひまわりのタネ、いっしょに食べる？"]],
+ ["poniko","ぽに子","#d88aa8",46, 18.5,44.6, 540,["パッカパッカ♪ 走ると気持ちいいね！","たてがみ、といてきたの。にあう？","ドッグレース、いつも応えんしてるよ！"]],
+ ["meemee","メエメエ","#b8c8d8",48, 13.5,50.5, 500,["メエ〜。ふわふわの毛が じまんなの","春になったら 毛がりの季節ね","くさはらの草、おいしいのよ〜"]],
+ ["mogurin","もぐりん","#7a5a48",50, 16.5,92.5, 350,["土の中から こんにちは！","キラキラのばしょ、地下でつながってるんだよ","おひさま、まぶしいなあ…"]],
+ ["kawacchi","かわっち","#8a7a5a",52, 52.5,111.5, 620,["湖でぷかぷかするの、大好き！","貝を割るの、とくいなんだ〜","いっしょに 泳がない？ …犬かきで！"]],
+ ["ga-ko","がーこ","#e8d048",54, 58.5,116.5, 580,["があがあ！ 水べは いいねえ","アヒルじゃないよ、がーこだよ","雨の日は テンションあがっちゃう！"]],
+ ["harry","ハリー","#a88a6a",60, 14.5,24.5, 460,["ハリネズミのハリーだよ。チクチクしてごめんね","まるまるのが とくいなんだ","こわがらないで。なでるときは そーっとね"]],
+ ["ho-chan","ほーちゃん","#8a7a9a",62, 44.5,8.5, 320,["ホーホー。夜の見回りは まかせて","昼間は ねむいんだ…ふぁ…","星空って いいよね。夜も遊びにおいで"]],
+ ["koaran","こあらん","#9aa8b8",64, 26.5,55.5, 480,["ユーカリ…はないけど、この町の木も好き","だっこ、してあげようか？","おひるね 20時間は ふつうだよ？"]],
+ ["mo-san","モーさん","#c8b8a8",66, 12.5,97.5, 300,["モ〜。のんびりが いちばんだねえ","牛にゅう、毎日飲んでる？","広場の草、たべていいのかな…だめ？"]],
+ ["pakarun","ぱかるん","#e0d0b8",68, 23.5,103.5, 560,["ふわっふわの毛、さわってみる？","アルパカのつば、飛ばさないから安心して","高いところ、けっこう平気なんだ"]],
+ ["rakkosuke","ラッコすけ","#8a7a6a",70, 20.5,126.5, 600,["湖にぷかー。貝をコンコン","おなかの上が ぼくのテーブル","手をつないで ねるんだよ。流されないように"]],
+ ["kamekichi","カメ吉","#7aa86a",72, 42.5,150.5, 280,["のんびり行こう。それがコツじゃ","こう見えて 100さいなんじゃよ","こうらは たたかないでおくれ〜"]],
+ ["inkochan","いんこちゃん","#e86a8a",74, 30.5,159.5, 780,["マネっこ とくいだよ！『おさんぽ びより！』","海の風、気持ちいいね〜","おしゃべり、とまらなくなっちゃう！"]],
+ ["kuroe","クロエ","#5a5a6a",76, 63.5,41.5, 660,["ふふ。黒ねこは 幸運のしるしよ","夜にすれちがっても おどろかないでね","ミケとは なかよしなの"]],
+ ["flamie","フラミー","#f088a0",78, 60.5,79.5, 640,["片足で立つの、つかれないよ？","ピンクの羽、お花畑と おそろい♪","バランスかんかく、きたえてるの"]],
+ ["sarumon","サルもん","#b87a5a",80, 8.5,66.5, 520,["ウッキー！ 木のぼり competition する？","バナナがあったら 教えて！","かたたたき、してあげよっか？"]],
+ ["kumagoro","くま五郎","#8a6a4a",82, 70.5,10.5, 340,["はちみつは モカと はんぶんこ","ふゆごもりの まえに いっぱい遊ぼう","この町、あったかくて ねむくなるなあ"]],
+ ["ookamin","おおかみん","#7a8a9a",84, 66.5,20.5, 400,["がおー！ …おどろいた？ ごめんごめん","月の夜は とおぼえしたくなるんだ","森のパトロールは まかせて"]],
+ ["paopao","ぱおぱお","#a8b8a8",86, 48.5,64.5, 360,["ぱおーん！ 白黒もようが チャームポイント","ささのは、ぽりぽり…あ、見てた？","ごろごろするの、とくいだよ"]],
+ ["toranosuke","とらのすけ","#e8a048",88, 10.5,116.5, 380,["がるる…なんてね。やさしいトラだよ","しまもよう、かっこいいでしょ？","ひなたぼっこは トラの特けんだ"]],
+ ["zo-san","ゾーさん","#9aa8b8",90, 52.5,159.5, 260,["長い鼻で 水あそび！ 海はさいこう！","背中に乗せてあげたいなあ","鼻で あくしゅ しよう！"]],
+ ["kabao","カバ夫","#a89ab8",91, 64.5,130.5, 300,["大きな口、あーん！","水の中なら 身が軽いんだ","あくびじゃないよ、あいさつだよ"]],
+ ["waniwani","ワニワニ","#7a9a6a",92, 28.5,136.5, 340,["ガブッ！…なんて しないから安心して","日なたで じっとするの 好きなんだ","なみだは 出るけど かなしくないよ"]],
+ ["lionmaru","ライオン丸","#d8a048",94, 70.5,92.5, 320,["百じゅうの王…だけど、この町では のんびり屋","たてがみの 手入れ、たいへんなんだぞ","ガオーの練習、聞いてくれる？"]],
+ ["komorin","こもりん","#8a7aa8",95, 74.5,16.5, 700,["さかさまから こんにちは！","夜行せいだけど、みんなに会いたくて…","はねで つつむと あったかいんだよ"]]
 ];
 for(const [key,name,tag,minSpirit,tx,ty,pitch,lines] of NEWCOMERS){
   VILLAGERS.push({ name, key, tag, minSpirit, pitch, lines,
@@ -1177,7 +1196,7 @@ for(const v of VILLAGERS){
 }
 
 const critters = [
-  {img:BIRD, x:12*T,       y:35.2*T,    msg:"ちゅん ちゅん♪", phase:4},
+  {img:BIRD, x:24*T,       y:69.2*T,    msg:"ちゅん ちゅん♪", phase:4},
   {img:DUCK, x:POND.cx*T,  y:POND.cy*T, msg:"があ があ〜", phase:1, duck:true, ang:0}
 ];
 
@@ -1470,7 +1489,7 @@ function startDialog(v){
   uiOpen();
 }
 function startFishing(bx,by){
-  fishing = { bx, by, sea: by >= 72*T, t:0, biteT:1.5+Math.random()*2.8, state:"wait", hookT:0 };
+  fishing = { bx, by, sea: by >= 165*T, t:0, biteT:1.5+Math.random()*2.8, state:"wait", hookT:0 };
   if(weather==="ame") fishing.biteT *= 0.55;   /* 雨の日は入れ食い */
   splash();
 }
@@ -3099,22 +3118,22 @@ function drawWorld(){
       const oy = bob ? Math.round(Math.sin(time*1.8+cx)*2) : 0;
       items.push({y:by, f:()=>ctx.drawImage(im, Math.round(cx-im.width/2), Math.round(by-im.height)+oy)});
     };
-    D("garland",    19.5*T, 22.5*T);
-    D("fuusen-set", 14.0*T, 23.4*T, true);
-    D("fuusen-set", 25.9*T, 28.4*T, true);
-    D("hana-arch",  19.5*T, 30.8*T);
-    D("picnic",     23.5*T, 26.2*T);
-    D("cart",       16.2*T, 23.3*T);
-    D("party-flag", 22.2*T, 28.7*T);
-    D("chochin",    25.2*T, 23.6*T, true);
-    D("stage-mini", 10.5*T, 35.0*T);
+    D("garland",    39.5*T, 49.7*T);
+    D("fuusen-set", 34.0*T, 50.4*T, true);
+    D("fuusen-set", 46.4*T, 59.4*T, true);
+    D("hana-arch",  39.5*T, 62.9*T);
+    D("picnic",     43.8*T, 53.2*T);
+    D("cart",       36.2*T, 50.3*T);
+    D("party-flag", 42.4*T, 59.7*T);
+    D("chochin",    45.2*T, 50.6*T, true);
+    D("stage-mini", 30.5*T, 57.6*T);
     /* ことりの合唱団と はなのようせい */
     if(VIMG["kotori-tai"]){
-      const im = VIMG["kotori-tai"], kx = 29.5*T, ky = 40.6*T;
+      const im = VIMG["kotori-tai"], kx = 57.5*T, ky = 74.6*T;
       items.push({y:ky, f:()=>ctx.drawImage(im, Math.round(kx-im.width/2), Math.round(ky-im.height + Math.sin(time*2.4)*1.5))});
     }
     if(VIMG["yousei"]){
-      const im = VIMG["yousei"], fx2 = 10.2*T, fy2 = 38.4*T;
+      const im = VIMG["yousei"], fx2 = 16.2*T, fy2 = 69.4*T;
       items.push({y:fy2, f:()=>ctx.drawImage(im, Math.round(fx2-im.width/2), Math.round(fy2-im.height-6 + Math.sin(time*1.6)*3))});
     }
   }
@@ -3216,12 +3235,13 @@ function drawWorld(){
     ctx.fillRect(0,0,VW,VH);
   }
   if(phase.night > 0){
-    ctx.fillStyle = `rgba(20,28,75,${0.42*phase.night})`;
+    /* 明るめの夜（スマホでも見やすく） */
+    ctx.fillStyle = `rgba(24,32,80,${0.26*phase.night})`;
     ctx.fillRect(0,0,VW,VH);
   }
   /* 今日の天気 */
   if(weather==="kumo"){
-    ctx.fillStyle = "rgba(120,130,150,0.10)"; ctx.fillRect(0,0,VW,VH);
+    ctx.fillStyle = "rgba(120,130,150,0.06)"; ctx.fillRect(0,0,VW,VH);
   }else if(weather==="kiri"){
     ctx.fillStyle = "rgba(235,240,245,0.26)"; ctx.fillRect(0,0,VW,VH);
   }else if(weather==="ame"){
@@ -3347,9 +3367,9 @@ function drawUI(){
   const fs2 = Math.max(10, 4.2*csc);
   uictx.font = `bold ${fs2}px 'Hiragino Maru Gothic ProN', sans-serif`;
   const tw2 = uictx.measureText(label2).width;
-  roundRect(uictx, 4*csc, 14*csc, tw2+6*csc, 7.8*csc, 3.9*csc, "rgba(255,255,255,0.84)");
+  roundRect(uictx, 4*csc, 15.4*csc, tw2+6*csc, 7.8*csc, 3.9*csc, "rgba(255,255,255,0.84)");
   uictx.fillStyle = care.sick ? "#c0392b" : "#8a5f47";
-  uictx.fillText(label2, 7*csc, 18*csc);
+  uictx.fillText(label2, 7*csc, 19.4*csc);
   /* ランキングチップ（おせわ指数と順位を常時表示） */
   let label3;
   if(rankInfo && rankInfo.rank){
@@ -3362,9 +3382,9 @@ function drawUI(){
   const fs3 = Math.max(10, 4.2*csc);
   uictx.font = `bold ${fs3}px 'Hiragino Maru Gothic ProN', sans-serif`;
   const tw3 = uictx.measureText(label3).width;
-  roundRect(uictx, 4*csc, 23.6*csc, tw3+6*csc, 7.8*csc, 3.9*csc, "rgba(255,246,220,0.9)");
+  roundRect(uictx, 4*csc, 26.2*csc, tw3+6*csc, 7.8*csc, 3.9*csc, "rgba(255,246,220,0.9)");
   uictx.fillStyle = "#a8762e";
-  uictx.fillText(label3, 7*csc, 27.6*csc);
+  uictx.fillText(label3, 7*csc, 30.2*csc);
 
   for(const f of floatTexts){
     const [sx,sy] = W2S(f.x, f.y);
@@ -3451,8 +3471,8 @@ function drawMinimap(wpx, hpx){
   uictx.font = `${Math.max(14, mw*0.09)}px sans-serif`;
   uictx.fillText("🫛", mx+(STALL.tx+1)*3*scl, my+(STALL.ty+0.5)*3*scl);
   uictx.fillText("🏁", mx+(RACEGATE.tx+1.5)*3*scl, my+(RACEGATE.ty)*3*scl);
-  uictx.fillText("🎣", mx+19*3*scl, my+53*3*scl);
-  uictx.fillText("🌸", mx+7*3*scl, my+58*3*scl);
+  uictx.fillText("🎣", mx+40*3*scl, my+114*3*scl);
+  uictx.fillText("🌸", mx+11*3*scl, my+145*3*scl);
   /* いまここ（点滅） */
   const px = mx + (player.x/T)*3*scl, py = my + (player.y/T)*3*scl;
   uictx.fillStyle = `rgba(255,60,90,${0.5+0.4*Math.abs(Math.sin(time*4))})`;
