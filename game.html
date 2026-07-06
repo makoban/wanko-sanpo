@@ -832,6 +832,32 @@ let weather = (()=>{
 })();
 const WEATHER_EMOJI = {sun:"☀️", kumo:"☁️", ame:"🌧", yuki:"❄️", kiri:"🌫"};
 
+/* ================= はじめてのチュートリアル ================= */
+let tutStep = 0, tutMoveT = 0;
+const TUT_STEPS = [
+  {t:()=>"指でドラッグ（PCは矢印キー）で歩いてみよう！"},
+  {t:()=>`🍖ボタンで${dName()}にごはんをあげよう`},
+  {t:()=>`🐾ボタンで${dName()}をなでなでしよう`},
+  {t:()=>"住民さんに近づいて、タップ／スペースで話そう",
+   target:()=>{ const v=VILLAGERS.find(v=>v.key==="moka"); return [v.x, v.y]; }},
+  {t:()=>"🫛そらまめ商店に行ってみよう（矢印の方だよ）",
+   target:()=>[STALL.tx*T+24, STALL.ty*T+30]},
+  {t:()=>"さんばしの先で水に向かってタップ！ つりをしてみよう",
+   target:()=>[39.5*T, 116*T]}
+];
+function tutDone(n){
+  if(tutStep !== n) return;
+  tutStep++;
+  markSave();
+  jingle();
+  if(tutStep >= TUT_STEPS.length){
+    bells += 200; addCare(10);
+    popup = { text:"🎓 チュートリアル完了！ ごほうびに200ベル！ あとは毎日30秒、お世話をわすれずに♪", t:5.5 };
+  }else{
+    popup = { text:"✅ できた！ つぎ → " + TUT_STEPS[tutStep].t(), t:3.6 };
+  }
+}
+
 /* ================= もちもの・セーブ ================= */
 let bells = 0, hasBall = false, bandana = null, petCount = 0;
 let playerName = "", dogName = "", raceWins = 0, dogBreed = "shiba";
@@ -912,7 +938,7 @@ function doSave(){
       bells, hasBall, bandana, petCount, playerName, dogName, raceWins, dogBreed,
       accessory, fashionOwned, furnInv, placedFurn,
       foodStock, medCount, care, poops, savedAt: Date.now(),
-      careScore, playerId, lastPlayDay, spirit,
+      careScore, playerId, lastPlayDay, spirit, tut: tutStep,
       apple:pocket.apple, fossil:pocket.fossil,
       fishInv, bugInv,
       caughtFish:[...caughtFish], caughtBug:[...caughtBug],
@@ -935,6 +961,7 @@ function loadSave(){
     if(Array.isArray(d.placedFurn)) placedFurn.push(...d.placedFurn.slice(0,60));
     careScore = d.careScore||0; playerId = d.playerId||""; lastPlayDay = d.lastPlayDay||"";
     if(d.spirit != null) spirit = clamp(d.spirit, 0, 100);
+    tutStep = d.tut != null ? d.tut : (d.playerName ? 99 : 0);   /* 既存プレイヤーはスキップ */
     foodStock = d.foodStock||0; medCount = d.medCount||0;
     if(d.care) Object.assign(care, d.care);
     if(!playerName) care.stage = "puppy";               /* はじめてなら こいぬから */
@@ -1439,6 +1466,7 @@ function dirVec(){
   return player.dir==="left"?[-1,0]:player.dir==="right"?[1,0]:player.dir==="up"?[0,-1]:[0,1];
 }
 function startDialog(v){
+  tutDone(3);
   let text;
   if(v.quest && questHave(v.quest)){
     questConsume(v.quest);
@@ -1547,6 +1575,7 @@ function tryAction(){
       jingle();
       fishing = null;
       addCare(1); markSave();
+      tutDone(5);
     }
     return;
   }
@@ -1672,6 +1701,7 @@ function dogAction(){
     return;
   }
   petCount++;
+  tutDone(2);
   dog.happyT = 1.2; dog.sayT = 1.2; dog.jumpT = 0.45;
   bark();
   if(time - care.lastPetG > 30){ care.growth += 1; care.lastPetG = time; checkGrowth(); addCare(1); }
@@ -1857,6 +1887,7 @@ function sellRow(label, count, total, fn){
     <button ${count? "" : "disabled"} data-sell="${fn}">売る</button></div>`;
 }
 function openShop(){
+  tutDone(4);
   if(shopPanel.style.display !== "block") uiOpen();   /* 再描画時は鳴らさない */
   bookPanel.style.display = "none";
   const fishTotal = ALL_FISH.reduce((a,f)=>a+(fishInv[f.name]||0)*f.price, 0);
@@ -2065,6 +2096,7 @@ function feedDog(){
   [0,180,360].forEach(t=>setTimeout(()=>noiseSfx(0.06, 0.05, 1500, 500), t));
   poopTimer = 50 + Math.random()*70;
   updateFeedBtn(); markSave();
+  tutDone(1);
 }
 function checkGrowth(){
   if(care.stage==="puppy" && care.growth>=120){
@@ -2445,6 +2477,9 @@ function update(dt){
     f.t -= dt; f.y -= 14*dt;
     if(f.t<=0) floatTexts.splice(i,1);
   }
+
+  /* --- チュートリアル：歩けたか --- */
+  if(tutStep===0 && player.moving){ tutMoveT += dt; if(tutMoveT > 1.1) tutDone(0); }
 
   /* --- オートセーブ --- */
   saveTimer -= dt;
@@ -3386,6 +3421,43 @@ function drawUI(){
   uictx.fillStyle = "#a8762e";
   uictx.fillText(label3, 7*csc, 30.2*csc);
 
+  /* チュートリアルガイド（初回のみ） */
+  if(tutStep < TUT_STEPS.length && !dialog && !fishing && !farewell){
+    const st = TUT_STEPS[tutStep];
+    const gfs = Math.max(11, 4.3*csc);
+    uictx.font = `bold ${gfs}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    const gtxt = `📌 ${tutStep+1}/${TUT_STEPS.length}　` + st.t();
+    const gtw = Math.min(uictx.measureText(gtxt).width, wpx*0.88);
+    const gh = 9.4*csc;
+    const gx = wpx/2 - (gtw+9*csc)/2, gy = hpx - gh - 4*csc;
+    roundRect(uictx, gx, gy, gtw+9*csc, gh, gh/2, `rgba(255,255,255,${0.86+Math.sin(time*3)*0.06})`);
+    uictx.strokeStyle = "#ffb0c8"; uictx.lineWidth = 2; uictx.stroke();
+    uictx.fillStyle = "#c05577";
+    uictx.textAlign = "center";
+    uictx.fillText(gtxt, wpx/2, gy+gh/2, wpx*0.84);
+    uictx.textAlign = "left";
+    /* 目的地の方向を矢印で */
+    if(st.target){
+      const [txp,typ] = st.target();
+      const ddx = txp-player.x, ddy = typ-player.y;
+      if(Math.hypot(ddx,ddy) > 100){
+        const ang = Math.atan2(ddy,ddx);
+        const ax = wpx/2 + Math.cos(ang)*wpx*0.30;
+        const ay = hpx*0.44 + Math.sin(ang)*hpx*0.26;
+        uictx.save();
+        uictx.translate(ax,ay); uictx.rotate(ang);
+        uictx.translate(Math.sin(time*4)*3, 0);
+        const s3 = 3.4*csc/2.5;
+        uictx.fillStyle = "rgba(255,143,174,0.95)";
+        uictx.strokeStyle = "#fff"; uictx.lineWidth = 3;
+        uictx.beginPath();
+        uictx.moveTo(3.4*s3, 0); uictx.lineTo(-2*s3, -2.4*s3); uictx.lineTo(-2*s3, 2.4*s3);
+        uictx.closePath(); uictx.stroke(); uictx.fill();
+        uictx.restore();
+      }
+    }
+  }
+
   for(const f of floatTexts){
     const [sx,sy] = W2S(f.x, f.y);
     const ffs = Math.max(11, 4.6*sc);
@@ -3626,6 +3698,7 @@ window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundIte
   spiritTier, setSpirit:(v)=>{ spirit = clamp(v,0,100); }, getSpirit:()=>spirit,
   setBreed:(b)=>{ dogBreed = b; }, getBreed:()=>dogBreed, DOG_BREEDS, openNamePanel,
   setWeather:(w)=>{ weather = w; }, getWeather:()=>weather, placedFurn, furnInv, fashionOwned,
+  getTut:()=>tutStep, tutDone,
   get careScore(){ return careScore; },
   get rankInfo(){ return rankInfo; },
   toggleMap:()=>{ mapOpen = !mapOpen; },
