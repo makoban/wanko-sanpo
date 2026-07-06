@@ -3192,6 +3192,12 @@ if(!playerId){
 }
 setTimeout(()=>{ if(playerName) submitScore(); }, 2500);
 
+/* とじる直前・タブが見えなくなった瞬間にも必ずセーブ（スマホの急な終了対策） */
+addEventListener("pagehide", ()=>{ if(saveDirty) doSave(); });
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState === "hidden" && saveDirty) doSave();
+});
+
 /* --- あそぶまえの おやくそく（まいかい ひょうじ） --- */
 (function(){
   const pp = document.getElementById("promisePanel");
