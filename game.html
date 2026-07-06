@@ -840,7 +840,7 @@ const RANK_API = "https://wanko-rank.ai-fudosan.workers.dev";
 let careScore = 0, playerId = "", lastPlayDay = "";
 let rankInfo = null, netDirty = true, netTimer = 5;
 /* --- まちのげんきど（0〜100）：お世話で上がり、実時間放置で下がる --- */
-let spirit = 50;
+let spirit = 45;   /* 新しい町は「ふつう」から育てていく */
 const spiritTier = ()=> spirit < 25 ? 0 : spirit < 60 ? 1 : spirit < 85 ? 2 : 3;
 /* おきゃくさまは きらきらの町にだけ・新住民は元気度が上がると引っこしてくる */
 const vActive = v => v.tourist ? spiritTier() >= 3
@@ -1113,7 +1113,7 @@ const VILLAGERS = [
     lines:["やあ！ 今日もいい天気だべあ〜","ふんすいの音、落ち着くべあ…","はちみつトースト食べたいべあ… じゅるり"] },
   { name:"ミケ", key:"mike", tag:"#e8a24e",
     img: makeVillager(HEAD_CAT, {s:"#f2b264", T:"#4f9c3d", t:"#6fbf5b"}),
-    hx:45.5*T, hy:53.5*T, pitch:680,
+    hx:43.5*T, hy:56.5*T, pitch:680,
     lines:["ひなたでお昼ねするのが好きなのにゃ〜","お魚をつったら見せてほしいにゃん！","この町、広くなったよね〜にゃ"] },
   { name:"ケロた", key:"kerota", tag:"#5daf3f",
     img: makeVillager(HEAD_FROG, {s:"#8fd06c", T:"#ffd166", t:"#ffe08c"}),
