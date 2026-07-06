@@ -151,7 +151,23 @@
     width:26px; height:26px; image-rendering:pixelated;
     vertical-align:-7px; margin-right:7px;
   }
-  #namePanel{ inset:auto 8%; top:10%; z-index:30; }
+  #namePanel{ inset:auto 8%; top:6%; z-index:30; max-height:86%; }
+  /* 犬種えらび */
+  #breedPick{ display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
+  #breedPick .bopt{
+    width:58px; padding:5px 2px 4px; border-radius:12px; cursor:pointer;
+    background:#fff; border:2px solid #f0cdb8; text-align:center;
+  }
+  #breedPick .bopt.sel{
+    border-color:#ff8fae; background:#fff0f5;
+    box-shadow:0 0 0 2px rgba(255,143,174,.3);
+  }
+  #breedPick .bimg{
+    width:48px; height:48px; margin:0 auto;
+    background-repeat:no-repeat; background-size:144px 144px;
+    image-rendering:pixelated;
+  }
+  #breedPick .bnm{ font-size:9px; color:#8a5f47; line-height:1.3; font-weight:bold; }
   #promisePanel{ inset:auto 6%; top:6%; z-index:40; display:block; text-align:center; line-height:1.85; }
   #promisePanel .promise-warn{
     margin:10px auto; padding:8px 12px; max-width:430px;
@@ -238,6 +254,10 @@
       <div class="name-row">
         <label>🐕 わんちゃんの名前</label>
         <input id="nameDog" maxlength="8" placeholder="ぽち">
+      </div>
+      <div class="name-row">
+        <label>🐶 犬種をえらぶ</label>
+        <div id="breedPick"></div>
       </div>
       <button id="nameOk" class="name-ok">これで始める！</button>
     </div>
@@ -623,6 +643,20 @@ const VIMG = {};
   im.onload = ()=>{ VIMG[n] = im; };
   im.src = "sprites/items/" + cat + "/" + n + ".png";
 });
+/* --- v6：犬種シート（パートナー犬えらび用） --- */
+const DOG_BREEDS = [
+  ["shiba","しば犬"],["shirosiba","白しば"],["poodle","プードル"],["chihuahua","チワワ"],
+  ["dachs","ダックス"],["corgi","コーギー"],["pome","ポメラニアン"],["pug","パグ"],
+  ["husky","ハスキー"],["golden","ゴールデン"],["dalmatian","ダルメシアン"],
+  ["schnauzer","シュナウザー"],["frenchbull","フレンチブル"]
+];
+const breedLabel = ()=> (DOG_BREEDS.find(b=>b[0]===dogBreed)||DOG_BREEDS[0])[1];
+DOG_BREEDS.forEach(([k])=>{
+  if(k==="shiba") return;   /* しば犬は既存のSPR.dogを使う */
+  const im = new Image();
+  im.onload = ()=>{ SPR["dogb_"+k] = sliceSheet(im, false); };
+  im.src = "sprites/48/dogs/" + k + ".png";
+});
 /* --- レースのライバル犬（v5） --- */
 const RIVALS = {};
 ["rival_shiro","rival_chobi","rival_gon"].forEach(n=>{
@@ -699,7 +733,7 @@ const icn = (cat,f)=>`<img class="icn" src="sprites/items/${cat}/${f}.png" alt="
 
 /* ================= もちもの・セーブ ================= */
 let bells = 0, hasBall = false, bandana = null, petCount = 0;
-let playerName = "", dogName = "", raceWins = 0;
+let playerName = "", dogName = "", raceWins = 0, dogBreed = "shiba";
 /* --- おせわ指数（オンラインランキング） --- */
 const RANK_API = "https://wanko-rank.ai-fudosan.workers.dev";
 let careScore = 0, playerId = "", lastPlayDay = "";
@@ -771,7 +805,7 @@ function doSave(){
     const love = {};
     for(const v of VILLAGERS) love[v.key] = v.love;
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      bells, hasBall, bandana, petCount, playerName, dogName, raceWins,
+      bells, hasBall, bandana, petCount, playerName, dogName, raceWins, dogBreed,
       foodStock, medCount, care, poops, savedAt: Date.now(),
       careScore, playerId, lastPlayDay, spirit,
       apple:pocket.apple, fossil:pocket.fossil,
@@ -789,7 +823,7 @@ function loadSave(){
     bells = d.bells||0; hasBall = !!d.hasBall; bandana = d.bandana||null;
     petCount = d.petCount||0;
     playerName = d.playerName||""; dogName = d.dogName||"";
-    raceWins = d.raceWins||0;
+    raceWins = d.raceWins||0; dogBreed = d.dogBreed||"shiba";
     careScore = d.careScore||0; playerId = d.playerId||""; lastPlayDay = d.lastPlayDay||"";
     if(d.spirit != null) spirit = clamp(d.spirit, 0, 100);
     foodStock = d.foodStock||0; medCount = d.medCount||0;
@@ -1452,9 +1486,24 @@ function closePanels(){
 /* --- なまえ入力パネル --- */
 const namePanel = document.getElementById("namePanel");
 let nameOkDone = false;
+function renderBreedPick(){
+  document.getElementById("breedPick").innerHTML = DOG_BREEDS.map(([k,nm])=>`
+    <div class="bopt${k===dogBreed?" sel":""}" data-breed="${k}">
+      <div class="bimg" style="background-image:url(sprites/48/${k==="shiba"?"dog":"dogs/"+k}.png)"></div>
+      <div class="bnm">${nm}</div>
+    </div>`).join("");
+}
+document.getElementById("breedPick").addEventListener("click", (e)=>{
+  const el = e.target.closest("[data-breed]");
+  if(!el) return;
+  dogBreed = el.dataset.breed;
+  renderBreedPick();
+  popSound();
+});
 function openNamePanel(){
   document.getElementById("nameGirl").value = playerName;
   document.getElementById("nameDog").value = dogName;
+  renderBreedPick();
   namePanel.style.display = "block";
   uiOpen();
 }
@@ -1687,7 +1736,7 @@ function toggleBook(){
     <div class="row"><span class="nm">🔔 ベル</span><span class="bells">${bells}</span></div>
     <div class="row"><span class="nm">💗 なでなで</span><span>${petCount}</span></div>
     <div class="row"><span class="nm">🏁 レース優勝</span><span>${raceWins}回</span></div>
-    <div class="row"><span class="nm">🐕 ${dName()}</span><span>${({puppy:"子犬",adult:"大人",senior:"シニア"})[care.stage]} ・ 育ち度 ${care.growth}</span></div>
+    <div class="row"><span class="nm">🐕 ${dName()}</span><span>${breedLabel()} ・ ${({puppy:"子犬",adult:"大人",senior:"シニア"})[care.stage]} ・ 育ち度 ${care.growth}</span></div>
     <div class="row"><span class="nm">⏰ 前のお散歩から</span><span>${fmtAbsence(lastAbsenceH)}</span></div>
     <div class="row"><span class="nm">🏅 お世話指数</span><span class="bells">${careScore}${rankInfo&&rankInfo.rank?`（${rankInfo.rank}位/${rankInfo.total}人）`:""}</span></div>
     <div class="row"><span class="nm">🦴 化石</span><span>${pocket.fossil}</span></div>`;
@@ -1713,6 +1762,8 @@ mapBtn.addEventListener("click", ()=>{
 });
 actBtn.addEventListener("click", ()=>dogAction());
 function dogSheet(){
+  /* しば犬以外の犬種は専用シート（成長ステージ共通） */
+  if(dogBreed !== "shiba" && SPR["dogb_"+dogBreed]) return SPR["dogb_"+dogBreed];
   if(care.stage==="puppy" && SPR.dog_puppy) return SPR.dog_puppy;
   if(care.stage==="senior" && SPR.dog_senior) return SPR.dog_senior;
   return SPR.dog || null;
@@ -3267,6 +3318,7 @@ window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundIte
   openShop, toggleBook, openNamePanel, openRaceGate, startRace,
   care, poops, feedDog, checkGrowth, dogAction, addCare, submitScore, fetchRank,
   spiritTier, setSpirit:(v)=>{ spirit = clamp(v,0,100); }, getSpirit:()=>spirit,
+  setBreed:(b)=>{ dogBreed = b; }, getBreed:()=>dogBreed, DOG_BREEDS, openNamePanel,
   get careScore(){ return careScore; },
   get rankInfo(){ return rankInfo; },
   toggleMap:()=>{ mapOpen = !mapOpen; },
