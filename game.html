@@ -685,7 +685,11 @@ const ICONS = {};
 const FOODBOWL = new Image(); FOODBOWL.src = "sprites/items/food/bowl-full.png";
 const POOPIMG = new Image(); POOPIMG.src = "sprites/items/care/poop.png";
 
-const SHEET_NAMES = ["girl","dog","moka","mike","kerota","penta","tonko","meeko","mimii","noron"];
+const SHEET_NAMES = ["girl","dog","moka","mike","kerota","penta","tonko","meeko","mimii","noron",
+  /* v6 新住民30体 */
+  "konta","ponkichi","ririsu","paopao","koaran","hamujiro","harry","ho-chan","ga-ko","meemee",
+  "mo-san","poniko","chuta","mogurin","kawacchi","flamie","kumagoro","pakarun","rakkosuke","kamekichi",
+  "inkochan","ookamin","kuroe","toranosuke","zo-san","kabao","waniwani","lionmaru","sarumon","komorin"];
 /* 48px版(v3かわいい)を優先、なければ32px版(v1)にフォールバック */
 for(const n of SHEET_NAMES){
   const apply = (im, facesLeft)=>{
@@ -766,7 +770,10 @@ let rankInfo = null, netDirty = true, netTimer = 5;
 /* --- まちのげんきど（0〜100）：お世話で上がり、実時間放置で下がる --- */
 let spirit = 50;
 const spiritTier = ()=> spirit < 25 ? 0 : spirit < 60 ? 1 : spirit < 85 ? 2 : 3;
-const vActive = v => !(v.tourist && spiritTier() < 3);   /* おきゃくさまは きらきらの まちにだけ */
+/* おきゃくさまは きらきらの町にだけ・新住民は元気度が上がると引っこしてくる */
+const vActive = v => v.tourist ? spiritTier() >= 3
+                   : v.minSpirit ? spirit >= v.minSpirit
+                   : true;
 function addCare(n){
   careScore = Math.max(0, Math.min(999999, careScore + n));
   if(n > 0) spirit = clamp(spirit + n*0.6, 0, 100);
@@ -1046,6 +1053,44 @@ const VILLAGERS = [
     hx:17.5*T, hy:27.5*T, pitch:700,
     lines:["はちみつ、いかが〜？ …なんてね、今日は遊びに来たの♪","お花がいっぱいだから、ミツバチもうれしいの","元気な町には、あまーいかおりがするのよ〜"] }
 ];
+/* v6：新住民30体（町の元気度が上がると 引っこしてくる） */
+const NEWCOMERS = [
+ ["konta","こんた","#d98a3e",35, 5.5,7.5, 430,["こんこん！ 引っこしてきた、きつねのこんただよ","森のきのみのかくし場所、教えてあげようか？","しっぽ、ふさふさでしょ？ じまんなんだ"]],
+ ["ririsu","りりす","#c47a4a",38, 14.5,8.5, 740,["どんぐり集めがとくいなの！","ほっぺに木の実、つめすぎちゃった…","木のぼりなら まけないよ〜！"]],
+ ["ponkichi","ぽん吉","#8a6a4a",40, 26.5,31.5, 380,["ぽんぽこ〜！ にぎやかな町だなあ","たぬきねいり？ してないしてない！","おなかを たたくと いい音がするんだ"]],
+ ["chuta","チュー太","#9a9aa8",42, 29.5,19.2, 800,["チューっす！ ぼく、ちいさいけど元気！","チーズより きのみが好きなんだ","小さいから、みんなの足もとに 注意してね！"]],
+ ["hamujiro","ハム次郎","#e8b060",44, 34.5,18.5, 720,["ほっぺの ふくろに おやつが入ってるんだ","まわし車より お散歩のほうが 好きだなあ","ひまわりのタネ、いっしょに食べる？"]],
+ ["poniko","ぽに子","#d88aa8",46, 8.5,19.2, 540,["パッカパッカ♪ 走ると気持ちいいね！","たてがみ、といてきたの。にあう？","ドッグレース、いつも応えんしてるよ！"]],
+ ["meemee","メエメエ","#b8c8d8",48, 6.5,25.5, 500,["メエ〜。ふわふわの毛が じまんなの","春になったら 毛がりの季節ね","くさはらの草、おいしいのよ〜"]],
+ ["mogurin","もぐりん","#7a5a48",50, 9.5,35.5, 350,["土の中から こんにちは！","キラキラのばしょ、地下でつながってるんだよ","おひさま、まぶしいなあ…"]],
+ ["kawacchi","かわっち","#8a7a5a",52, 29.5,48.6, 620,["湖でぷかぷかするの、大好き！","貝を割るの、とくいなんだ〜","いっしょに 泳がない？ …犬かきで！"]],
+ ["ga-ko","がーこ","#e8d048",54, 33.5,51.5, 580,["があがあ！ 水べは いいねえ","アヒルじゃないよ、がーこだよ","雨の日は テンションあがっちゃう！"]],
+ ["harry","ハリー","#a88a6a",60, 9.5,11.5, 460,["ハリネズミのハリーだよ。チクチクしてごめんね","まるまるのが とくいなんだ","こわがらないで。なでるときは そーっとね"]],
+ ["ho-chan","ほーちゃん","#8a7a9a",62, 22.5,6.5, 320,["ホーホー。夜の見回りは まかせて","昼間は ねむいんだ…ふぁ…","星空って いいよね。夜も遊びにおいで"]],
+ ["koaran","こあらん","#9aa8b8",64, 12.5,30.5, 480,["ユーカリ…はないけど、この町の木も好き","だっこ、してあげようか？","おひるね 20時間は ふつうだよ？"]],
+ ["mo-san","モーさん","#c8b8a8",66, 33.5,29.5, 300,["モ〜。のんびりが いちばんだねえ","牛にゅう、毎日飲んでる？","広場の草、たべていいのかな…だめ？"]],
+ ["pakarun","ぱかるん","#e0d0b8",68, 24.5,38.5, 560,["ふわっふわの毛、さわってみる？","アルパカのつば、飛ばさないから安心して","高いところ、けっこう平気なんだ"]],
+ ["rakkosuke","ラッコすけ","#8a7a6a",70, 11.5,51.5, 600,["湖にぷかー。貝をコンコン","おなかの上が ぼくのテーブル","手をつないで ねるんだよ。流されないように"]],
+ ["kamekichi","カメ吉","#7aa86a",72, 26.5,60.5, 280,["のんびり行こう。それがコツじゃ","こう見えて 100さいなんじゃよ","こうらは たたかないでおくれ〜"]],
+ ["inkochan","いんこちゃん","#e86a8a",74, 10.5,66.5, 780,["マネっこ とくいだよ！『おさんぽ びより！』","海の風、気持ちいいね〜","おしゃべり、とまらなくなっちゃう！"]],
+ ["kuroe","クロエ","#5a5a6a",76, 14.5,18.5, 660,["ふふ。黒ねこは 幸運のしるしよ","夜にすれちがっても おどろかないでね","ミケとは なかよしなの"]],
+ ["flamie","フラミー","#f088a0",78, 30.5,40.5, 640,["片足で立つの、つかれないよ？","ピンクの羽、お花畑と おそろい♪","バランスかんかく、きたえてるの"]],
+ ["sarumon","サルもん","#b87a5a",80, 3.5,36.5, 520,["ウッキー！ 木のぼり competition する？","バナナがあったら 教えて！","かたたたき、してあげよっか？"]],
+ ["kumagoro","くま五郎","#8a6a4a",82, 16.5,37.5, 340,["はちみつは モカと はんぶんこ","ふゆごもりの まえに いっぱい遊ぼう","この町、あったかくて ねむくなるなあ"]],
+ ["ookamin","おおかみん","#7a8a9a",84, 33.5,6.5, 400,["がおー！ …おどろいた？ ごめんごめん","月の夜は とおぼえしたくなるんだ","森のパトロールは まかせて"]],
+ ["paopao","ぱおぱお","#a8b8a8",86, 23.5,29.5, 360,["ぱおーん！ 白黒もようが チャームポイント","ささのは、ぽりぽり…あ、見てた？","ごろごろするの、とくいだよ"]],
+ ["toranosuke","とらのすけ","#e8a048",88, 5.5,42.5, 380,["がるる…なんてね。やさしいトラだよ","しまもよう、かっこいいでしょ？","ひなたぼっこは トラの特けんだ"]],
+ ["zo-san","ゾーさん","#9aa8b8",90, 27.5,67.5, 260,["長い鼻で 水あそび！ 海はさいこう！","背中に乗せてあげたいなあ","鼻で あくしゅ しよう！"]],
+ ["kabao","カバ夫","#a89ab8",91, 35.5,56.5, 300,["大きな口、あーん！","水の中なら 身が軽いんだ","あくびじゃないよ、あいさつだよ"]],
+ ["waniwani","ワニワニ","#7a9a6a",92, 32.5,59.5, 340,["ガブッ！…なんて しないから安心して","日なたで じっとするの 好きなんだ","なみだは 出るけど かなしくないよ"]],
+ ["lionmaru","ライオン丸","#d8a048",94, 33.5,44.5, 320,["百じゅうの王…だけど、この町では のんびり屋","たてがみの 手入れ、たいへんなんだぞ","ガオーの練習、聞いてくれる？"]],
+ ["komorin","こもりん","#8a7aa8",95, 35.5,10.5, 700,["さかさまから こんにちは！","夜行せいだけど、みんなに会いたくて…","はねで つつむと あったかいんだよ"]]
+];
+for(const [key,name,tag,minSpirit,tx,ty,pitch,lines] of NEWCOMERS){
+  VILLAGERS.push({ name, key, tag, minSpirit, pitch, lines,
+    img: makeVillager(HEAD_BEAR, {s:"#c9a67a", m:"#e8d4b0", T:"#9fc4e8", t:"#c4dcf2"}),
+    hx:tx*T, hy:ty*T });
+}
 for(const v of VILLAGERS){
   v.x = v.hx; v.y = v.hy;
   v.state = "idle"; v.wt = Math.random()*2; v.tx = v.x; v.ty = v.y;
@@ -1265,7 +1310,7 @@ const QUEST_TYPES = [
 function activeQuests(){ return VILLAGERS.filter(v=>v.quest).length; }
 function tryAssignQuest(){
   if(activeQuests() >= 3) return;
-  const free = VILLAGERS.filter(v=>!v.quest && !v.tourist);
+  const free = VILLAGERS.filter(v=>!v.quest && !v.tourist && vActive(v));
   if(!free.length) return;
   const v = free[Math.floor(Math.random()*free.length)];
   const q = QUEST_TYPES[Math.floor(Math.random()*QUEST_TYPES.length)];
@@ -1774,6 +1819,7 @@ function toggleBook(){
     <div class="row"><span class="nm">💗 なでなで</span><span>${petCount}</span></div>
     <div class="row"><span class="nm">🏁 レース優勝</span><span>${raceWins}回</span></div>
     <div class="row"><span class="nm">🐕 ${dName()}</span><span>${breedLabel()} ・ ${({puppy:"子犬",adult:"大人",senior:"シニア"})[care.stage]} ・ 育ち度 ${care.growth}</span></div>
+    <div class="row"><span class="nm">🏘 町の住民</span><span>${VILLAGERS.filter(v=>!v.tourist && vActive(v)).length}人／${VILLAGERS.filter(v=>!v.tourist).length}人 <small class="muted">（元気度で増える）</small></span></div>
     <div class="row"><span class="nm">⏰ 前のお散歩から</span><span>${fmtAbsence(lastAbsenceH)}</span></div>
     <div class="row"><span class="nm">🏅 お世話指数</span><span class="bells">${careScore}${rankInfo&&rankInfo.rank?`（${rankInfo.rank}位/${rankInfo.total}人）`:""}</span></div>
     <div class="row"><span class="nm">🦴 化石</span><span>${pocket.fossil}</span></div>`;
