@@ -343,7 +343,7 @@ window.addEventListener("keydown", e=>{
   if((e.key==="f" || e.key==="F") && !dialog && !fishing && !race) feedDog();
   if(e.key==="x" || e.key==="X") dogAction();
   if((e.key==="m" || e.key==="M") && !race && !farewell){ mapOpen = !mapOpen; mapOpen ? uiOpen() : uiClose(); }
-  if(e.key==="Escape"){ closePanels(); mapOpen = false; if(race) race = null; }
+  if(e.key==="Escape"){ closePanels(); mapOpen = false; if(race) race = null; if(pachi){ pachi = null; } }
   keys[e.key] = true;
   if(e.key.length===1) keys[e.key.toLowerCase()] = true;
   initAudio();
@@ -380,6 +380,8 @@ stage.addEventListener("touchstart", e=>{
   if(e.target.tagName === "BUTTON" && e.target !== actBtn) return;
   /* レースちゅうは タップ＝おうえん れんだ */
   if(race){ actPressed = true; e.preventDefault(); return; }
+  /* ぽちんこちゅうは タップ＝玉を落とす */
+  if(pachi){ pachiTap(); e.preventDefault(); return; }
   /* ちずが ひらいていたら とじる */
   if(mapOpen){ mapOpen = false; uiClose(); e.preventDefault(); return; }
   /* パネルが ひらいているとき、そとをタップしたら とじるだけ */
@@ -619,7 +621,9 @@ const TOWN = {};
  "bench-koke","lamp-kire",
  "garland","hana-arch","fuusen-set","chochin","party-flag","picnic","stage-mini","cart",
  "hana-shiore","hana-tsubomi","hana-mankai","hana-hikari",
- "kusa-kare","zassou","mizutamari","ochiba","clover","kirakusa"].forEach(n=>{
+ "kusa-kare","zassou","mizutamari","ochiba","clover","kirakusa",
+ /* v8：あそびばストリート */
+ "pachinko-hall","gacha-stand","onsen","cafe"].forEach(n=>{
   const im = new Image();
   im.onload = ()=>{ TOWN[n] = im; };
   im.src = "sprites/town/" + n + ".png";
@@ -1105,6 +1109,11 @@ lamps.forEach(l=>{ if(!solid[l[1]][l[0]]) solid[l[1]][l[0]]=true; });
 /* ドッグレースじょうの ゲート（こうえんの ひがし） */
 const RACEGATE = { tx:64, ty:70 };
 solid[70][64]=true; solid[70][65]=true; solid[70][66]=true;
+/* あそびばストリート（広場のひがし）：ぽちんこホールとガチャポン */
+const PACHINKO = { tx:55, ty:48 };
+for(let y=49;y<52;y++) for(let x=55;x<59;x++) solid[y][x]=true;
+const GACHA = { tx:55, ty:55 };
+solid[55][55]=true;
 
 /* ミニマップ（地形を1回だけ描いておく） */
 let MINI = null;
@@ -1558,6 +1567,7 @@ function digAt(spot){
   addCare(1); markSave();
 }
 function tryAction(){
+  if(pachi){ pachiTap(); return; }
   if(dialog){
     if(dialog.chars < dialog.text.length){ dialog.chars = dialog.text.length; }
     else dialog = null;
@@ -1624,6 +1634,16 @@ function tryAction(){
     const d = dist(player.x,player.y, RACEGATE.tx*T+36, RACEGATE.ty*T+12);
     if(d < 54) cands.push({d:d*0.85, f:openRaceGate});
   }
+  /* ぽちんこホール */
+  {
+    const d = dist(player.x,player.y, (PACHINKO.tx+2)*T, (PACHINKO.ty+3.6)*T);
+    if(d < 56) cands.push({d:d*0.85, f:openPachinko});
+  }
+  /* ガチャポン */
+  {
+    const d = dist(player.x,player.y, GACHA.tx*T+12, GACHA.ty*T+18);
+    if(d < 42) cands.push({d:d*0.85, f:playGacha});
+  }
   /* むし */
   for(const b of bugs){
     const d = dist(player.x,player.y, b.x,b.y);
@@ -1679,6 +1699,7 @@ function tryAction(){
 }
 /* 🐾ボタン専用：わんこへのアクション（かんびょう / なでる / とおくなら よぶ） */
 function dogAction(){
+  if(pachi){ pachiRetry(); return; }
   if(dialog || race || farewell || fishing || mapOpen) return;
   const d = dist(player.x, player.y, dog.x, dog.y);
   if(d >= 50){
@@ -2027,6 +2048,253 @@ bookPanel.addEventListener("click", e=>{
   if(e.target.dataset.rename){ closePanels(); openNamePanel(); }
 });
 
+/* ================= ぽちんこホール＆ガチャポン（v8） ================= */
+const PACHI_IMG = {};
+["pachi-bg","pachi-ball","pachi-pin","pachi-jackpot","pachi-fever",
+ "capsule-aka","capsule-ao","capsule-kin","capsule-open"].forEach(n=>{
+  const im = new Image();
+  im.onload = ()=>{ PACHI_IMG[n] = im; };
+  im.src = "sprites/items/pachi/" + n + ".png";
+});
+let pachi = null;
+const PACHI_COST = 100, PACHI_BALLS = 5;
+const PACHI_PAY = [0, 10, 30, 180, 30, 10, 0];   /* 7ポケット・中央★が大当たり（実測還元率≒92%） */
+function openPachinko(){
+  if(bells < PACHI_COST){ floatTexts.push({x:player.x, y:player.y-20, text:`${PACHI_COST}ベルが必要…`, t:1.5}); return; }
+  bells -= PACHI_COST; markSave();
+  uiOpen();
+  const FW = Math.min(VW*0.92, 320), FH = Math.min(VH*0.72, 430);
+  const fx = (VW-FW)/2, fy = VH*0.09;
+  const pins = [];
+  const rows = 7, cols = 7, top = fy + FH*0.17, gapY = (FH*0.56)/rows, gx = FW/(cols+1);
+  for(let r=0;r<rows;r++){
+    const odd = r%2;
+    for(let c=0;c<cols-odd;c++) pins.push({x: fx + gx*(c+1) + (odd? gx/2 : 0), y: top + r*gapY});
+  }
+  /* 大当たりポケットの門番ピン（中央を通りにくく） */
+  pins.push({x: fx + FW/2 - FW/22, y: fy + FH - 32});
+  pins.push({x: fx + FW/2 + FW/22, y: fy + FH - 32});
+  pachi = { FW, FH, fx, fy, pins, balls: PACHI_BALLS, won: 0, ball: null,
+            state: "aim", flash: 0, lastPin: 0, resultMsg: "" };
+}
+function pachiTap(){
+  if(!pachi) return;
+  if(pachi.state === "aim" && pachi.balls > 0){
+    const mx = pachi.fx + pachi.FW/2 + Math.sin(time*2.4)*(pachi.FW/2 - 22);
+    pachi.ball = { x: mx, y: pachi.fy + 12, vx: 0, vy: 40 };
+    pachi.balls--;
+    pachi.state = "drop";
+    popSound();
+  }else if(pachi.state === "result"){
+    pachi = null;
+    uiClose();
+  }
+}
+function pachiRetry(){
+  if(!pachi || pachi.state !== "result" || bells < PACHI_COST) return;
+  bells -= PACHI_COST; markSave();
+  pachi.balls = PACHI_BALLS; pachi.won = 0; pachi.state = "aim"; pachi.resultMsg = "";
+  popSound();
+}
+function updatePachi(dt){
+  const P = pachi;
+  if(P.flash > 0) P.flash -= dt;
+  if(P.state !== "drop" || !P.ball) return;
+  const b = P.ball;
+  for(let s=0;s<2;s++){           /* 2サブステップで安定 */
+    const h = dt/2;
+    b.vy += 560*h;
+    b.x += b.vx*h; b.y += b.vy*h;
+    /* かべ */
+    if(b.x < P.fx+8){ b.x = P.fx+8; b.vx = Math.abs(b.vx)*0.65; }
+    if(b.x > P.fx+P.FW-8){ b.x = P.fx+P.FW-8; b.vx = -Math.abs(b.vx)*0.65; }
+    /* ピン */
+    for(const p of P.pins){
+      const dx = b.x-p.x, dy = b.y-p.y, d2 = dx*dx+dy*dy;
+      if(d2 < 81){                 /* (玉6+ピン3)^2 */
+        const d = Math.sqrt(d2)||1;
+        b.x = p.x + dx/d*9.2; b.y = p.y + dy/d*9.2;
+        b.vy = -Math.abs(b.vy)*0.32 - 14;
+        b.vx = (dx>=0?1:-1)*(46+Math.random()*54);
+        if(time - P.lastPin > 0.06){ pom(); P.lastPin = time; }
+      }
+    }
+  }
+  /* ポケット到達 */
+  if(b.y > P.fy + P.FH - 20){
+    const zone = clamp(Math.floor((b.x - P.fx)/(P.FW/7)), 0, 6);
+    const pay = PACHI_PAY[zone];
+    if(pay > 0){
+      bells += pay; P.won += pay; markSave();
+      if(pay >= 180){ fanfare(); P.flash = 1.4; floatTexts.push({x:player.x, y:player.y-30, text:"🌟 FEVER!!", t:2}); }
+      else coinSfx();
+    }else{
+      noiseSfx(0.15, 0.05, 600, 200);
+    }
+    P.lastPay = pay; P.payT = 0.9;
+    P.ball = null;
+    P.state = P.balls > 0 ? "aim" : "result";
+    if(P.state === "result"){
+      P.resultMsg = P.won >= PACHI_COST*2 ? "🎉 だいしょうり！" : P.won > 0 ? "また あそんでね♪" : "ざんねん…";
+    }
+  }
+  if(P.payT > 0) P.payT -= dt;
+}
+function drawPachi(){
+  const P = pachi;
+  ctx.fillStyle = "#3a2a3e"; ctx.fillRect(0,0,VW,VH);
+  /* 台のわく */
+  roundRectC(ctx, P.fx-10, P.fy-8, P.FW+20, P.FH+16, 14, "#e86e97");
+  roundRectC(ctx, P.fx-4,  P.fy-2, P.FW+8,  P.FH+4,  10, "#4a3228");
+  if(PACHI_IMG["pachi-bg"]){
+    ctx.drawImage(PACHI_IMG["pachi-bg"], P.fx, P.fy, P.FW, P.FH);
+  }else{
+    roundRectC(ctx, P.fx, P.fy, P.FW, P.FH, 8, "#ffe9f2");
+    /* にじアーチ */
+    for(let i=0;i<4;i++){
+      ctx.strokeStyle = ["#ff8fae","#ffd166","#8fd06c","#8fd7f0"][i];
+      ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(P.fx+P.FW/2, P.fy+P.FH*0.16, P.FW*0.26 - i*5, Math.PI, 0); ctx.stroke();
+    }
+  }
+  /* ポケット */
+  const zw = P.FW/7;
+  for(let z=0;z<7;z++){
+    const pay = PACHI_PAY[z];
+    ctx.fillStyle = pay>=180 ? "#ffd166" : pay>0 ? "#ffc2d6" : "#d8cbe0";
+    ctx.fillRect(P.fx+z*zw+2, P.fy+P.FH-18, zw-4, 16);
+    ctx.fillStyle = "#4a3228";
+    ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(pay>0? (pay>=180?"★"+pay:pay) : "×", P.fx+z*zw+zw/2, P.fy+P.FH-6);
+    ctx.textAlign = "left";
+  }
+  /* ピン */
+  for(const p of P.pins){
+    if(PACHI_IMG["pachi-pin"]) ctx.drawImage(PACHI_IMG["pachi-pin"], p.x-3, p.y-3, 6, 6);
+    else{ ctx.fillStyle = "#b9a8c8"; ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, 7); ctx.fill();
+          ctx.fillStyle = "#fff"; ctx.fillRect(p.x-1, p.y-2, 1.6, 1.6); }
+  }
+  /* ねらいマーカー */
+  if(P.state === "aim"){
+    const mx = P.fx + P.FW/2 + Math.sin(time*2.4)*(P.FW/2 - 22);
+    ctx.fillStyle = "#ff5f8f";
+    ctx.beginPath(); ctx.moveTo(mx, P.fy+14); ctx.lineTo(mx-6, P.fy+4); ctx.lineTo(mx+6, P.fy+4); ctx.closePath(); ctx.fill();
+  }
+  /* 玉 */
+  if(P.ball){
+    if(PACHI_IMG["pachi-ball"]) ctx.drawImage(PACHI_IMG["pachi-ball"], P.ball.x-6, P.ball.y-6, 12, 12);
+    else{ ctx.fillStyle = "#4a3228"; ctx.beginPath(); ctx.arc(P.ball.x, P.ball.y, 6.5, 0, 7); ctx.fill();
+          ctx.fillStyle = "#ffd166"; ctx.beginPath(); ctx.arc(P.ball.x, P.ball.y, 5.2, 0, 7); ctx.fill();
+          ctx.fillStyle = "#fff"; ctx.fillRect(P.ball.x-2, P.ball.y-3, 2.4, 2.4); }
+  }
+  /* フィーバーフラッシュ */
+  if(P.flash > 0){
+    ctx.fillStyle = `rgba(255,220,90,${Math.min(0.4, P.flash*0.35)})`;
+    ctx.fillRect(0,0,VW,VH);
+  }
+}
+function roundRectC(c,x,y,w,h,r,fill){
+  c.fillStyle = fill;
+  c.beginPath();
+  c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r);
+  c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); c.fill();
+}
+function drawPachiHud(wpx, hpx){
+  const P = pachi; if(!P) return;
+  const sc = (wpx/VW)*1.5;
+  uictx.textAlign = "center"; uictx.textBaseline = "middle";
+  uictx.font = `bold ${5.6*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+  uictx.fillStyle = "#ffd9e6";
+  uictx.fillText("🎰 ぽちんこホール", wpx/2, hpx*0.045);
+  uictx.font = `bold ${4.6*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+  uictx.fillStyle = "#fff";
+  uictx.fillText(`玉 ${"●".repeat(P.balls)}${"○".repeat(PACHI_BALLS-P.balls)}　かくとく 🔔${P.won}　もち🔔${bells}`, wpx/2, hpx*0.085);
+  uictx.font = `${3.9*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+  uictx.fillStyle = "#e8c9d8";
+  if(P.state === "aim") uictx.fillText("タップ／スペースで 玉を落とす！", wpx/2, hpx*0.96);
+  if(P.state === "result"){
+    roundRect(uictx, wpx*0.12, hpx*0.36, wpx*0.76, hpx*0.22, 8*sc, "rgba(58,42,62,0.92)");
+    uictx.font = `bold ${6.2*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.fillStyle = "#fff";
+    uictx.fillText(P.resultMsg, wpx/2, hpx*0.425);
+    uictx.font = `bold ${4.8*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.fillStyle = "#ffd166";
+    uictx.fillText(`かくとく 🔔${P.won}`, wpx/2, hpx*0.485);
+    uictx.font = `${3.8*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.fillStyle = "#e8c9d8";
+    uictx.fillText(bells >= PACHI_COST ? "🐾ボタン＝もう1回(100ベル)　タップ＝おわる" : "タップで おわる", wpx/2, hpx*0.545);
+  }
+  uictx.textAlign = "left";
+}
+/* --- あそびばストリートの たてもの --- */
+function drawPachinkoHall(){
+  const x = PACHINKO.tx*T, y = PACHINKO.ty*T;
+  const im = TOWN["pachinko-hall"];
+  if(im){ ctx.drawImage(im, Math.round(x + 48 - im.width/2), Math.round(y + 96 - im.height)); return; }
+  ctx.fillStyle="#4a3228"; ctx.fillRect(x, y+26, 96, 70);
+  ctx.fillStyle="#ffd9e6"; ctx.fillRect(x+3, y+29, 90, 64);
+  ctx.fillStyle="#e86e97"; ctx.fillRect(x-3, y+14, 102, 16);
+  ctx.fillStyle="#c05577"; ctx.fillRect(x-3, y+28, 102, 4);
+  ctx.fillStyle="#4a3228"; ctx.fillRect(x+16, y-4, 64, 20);
+  ctx.fillStyle = Math.floor(time*2.5)%2 ? "#ffd166" : "#ff8fae";
+  ctx.fillRect(x+19, y-1, 58, 14);
+  ctx.fillStyle="#4a3228"; ctx.font="bold 10px sans-serif"; ctx.textAlign="center";
+  ctx.fillText("ぽちんこ", x+48, y+9);
+  ctx.textAlign="left";
+  ctx.fillStyle="#8a5a3a"; ctx.fillRect(x+38, y+62, 20, 31);
+  for(let i=0;i<3;i++){
+    ctx.fillStyle=["#ffd166","#8fd7f0","#ff8fae"][i];
+    ctx.beginPath(); ctx.arc(x+18+i*30, y+46, 6, 0, 7); ctx.fill();
+  }
+}
+function drawGachaStand(){
+  const x = GACHA.tx*T, y = GACHA.ty*T;
+  const im = TOWN["gacha-stand"];
+  if(im){ ctx.drawImage(im, Math.round(x+12-im.width/2), Math.round(y+24-im.height)); return; }
+  ctx.fillStyle="#4a3228"; ctx.fillRect(x+2, y-16, 20, 40);
+  ctx.fillStyle="#e0575f"; ctx.fillRect(x+4, y+4, 16, 18);
+  ctx.fillStyle="#dff2fb"; ctx.beginPath(); ctx.arc(x+12, y-4, 9, 0, 7); ctx.fill();
+  ctx.fillStyle="#ffd166"; ctx.beginPath(); ctx.arc(x+9,  y-6, 3.2, 0, 7); ctx.fill();
+  ctx.fillStyle="#ff8fae"; ctx.beginPath(); ctx.arc(x+15, y-3, 3.2, 0, 7); ctx.fill();
+  ctx.fillStyle="#8fd06c"; ctx.beginPath(); ctx.arc(x+10, y-1, 3.0, 0, 7); ctx.fill();
+  ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(x+12, y+12, 4.4, 0, 7); ctx.fill();
+  ctx.fillStyle="#4a3228"; ctx.fillRect(x+11, y+8, 2, 8); ctx.fillRect(x+8, y+11, 8, 2);
+}
+/* --- ガチャポン --- */
+function playGacha(){
+  if(bells < 100){ floatTexts.push({x:player.x, y:player.y-20, text:"100ベルが必要…", t:1.5}); return; }
+  bells -= 100; markSave(); popSound();
+  popup = { text:"🎁 ガチャポン… カプセルがころん…", t:1.3 };
+  setTimeout(()=>{
+    const r = Math.random();
+    let msg;
+    if(r < 0.34){
+      const d = FURN_DEFS[Math.floor(Math.random()*FURN_DEFS.length)];
+      furnInv[d[0]] = (furnInv[d[0]]||0)+1;
+      msg = `🔵 カプセルから「${d[1]}」！（家具ゲット）`; jingle();
+    }else if(r < 0.70){
+      const un = FASHION_DEFS.filter(f=>!fashionOwned[f[0]]);
+      if(un.length){
+        const d = un[Math.floor(Math.random()*un.length)];
+        fashionOwned[d[0]] = true;
+        msg = `🔴 カプセルから「${d[1]}」！（きせかえゲット）`; jingle();
+      }else{ bells += 200; msg = "🔴 きせかえはコンプずみ！ かわりに200ベル"; coinSfx(); }
+    }else if(r < 0.92){
+      bells += 30; msg = "⚪ ざんねん… 中にはベル30…"; coinSfx();
+    }else{
+      const rare = ["kigurumi-dino","tenshi","kubiwa-gold","lead-gold"].filter(k=>!fashionOwned[k]);
+      if(rare.length){
+        const d = FASHION_DEFS.find(f=>f[0]===rare[0]);
+        fashionOwned[rare[0]] = true;
+        msg = `✨🌟 金カプセル！！「${d[1]}」！！`;
+      }else{ bells += 500; msg = "✨🌟 金カプセル！！ 500ベル！！"; }
+      fanfare();
+    }
+    addCare(1); markSave();
+    popup = { text: msg, t:3.8 };
+  }, 1000);
+}
+
 /* ================= おせわ（たまごっち） ================= */
 const feedBtn = document.getElementById("feedBtn");
 function updateFeedBtn(){ feedBtn.style.display = foodStock>0 ? "flex" : "none"; }
@@ -2084,7 +2352,7 @@ function setSick(){
   markSave();
 }
 function feedDog(){
-  if(foodStock<=0 || dialog || race || farewell) return;
+  if(foodStock<=0 || dialog || race || farewell || pachi) return;
   if(care.hunger>=98){ floatTexts.push({x:dog.x, y:dog.y-24, text:"おなかいっぱいみたい", t:1.4}); return; }
   foodStock--;
   care.hunger = Math.min(100, care.hunger + 40);
@@ -2159,6 +2427,7 @@ function update(dt){
     if(farewell.t > 7.5) newPuppy();
     return;
   }
+  if(pachi){ updatePachi(dt); return; }
   if(race){ updateRace(dt); return; }
   if(mapOpen) actPressed = false;   /* ちずを見ているあいだは アクションしない */
 
@@ -3089,6 +3358,7 @@ function drawBug(b, nightF){
 }
 
 function drawWorld(){
+  if(pachi){ drawPachi(); return; }
   if(race){ drawRace(); return; }
   const phase = dayPhase();
   cam.x = Math.round(clamp(player.x - VW/2, 0, MW*T-VW));
@@ -3148,6 +3418,8 @@ function drawWorld(){
   items.push({y:(FOUNTAIN.ty+FOUNTAIN.th)*T, f:drawFountain});
   items.push({y:(STALL.ty+2)*T, f:drawStall});
   items.push({y:(RACEGATE.ty+1)*T, f:drawRaceGate});
+  items.push({y:(PACHINKO.ty+4)*T, f:drawPachinkoHall});
+  items.push({y:(GACHA.ty+1)*T, f:drawGachaStand});
   /* きらきらの まち：おいわいの かざりつけ */
   if(spiritTier()===3){
     const D = (n, cx, by, bob)=>{
@@ -3341,6 +3613,7 @@ function drawUI(){
   const wpx = ui.width, hpx = ui.height;
   uictx.clearRect(0,0,wpx,hpx);
   if(farewell){ drawFarewell(wpx, hpx); return; }
+  if(pachi){ drawPachiHud(wpx, hpx); return; }
   if(race){ drawRaceUI(); return; }
   if(mapOpen){ drawMinimap(wpx, hpx); return; }
   const psc = wpx / VW;           /* 位置変換用 */
@@ -3384,6 +3657,20 @@ function drawUI(){
     if(d < 51 && !dialog){
       const [sx,sy] = W2S(STALL.tx*T+24, STALL.ty*T-27);
       bubble(sx, sy, "🫛 そらまめ商店", sc, true);
+    }
+  }
+  {
+    const d = dist(player.x,player.y, (PACHINKO.tx+2)*T, (PACHINKO.ty+3.6)*T);
+    if(d < 56 && !dialog){
+      const [sx,sy] = W2S((PACHINKO.tx+2)*T, PACHINKO.ty*T-10);
+      bubble(sx, sy, "🎰 ぽちんこホール（1回100ベル）", sc, true);
+    }
+  }
+  {
+    const d = dist(player.x,player.y, GACHA.tx*T+12, GACHA.ty*T+18);
+    if(d < 42 && !dialog){
+      const [sx,sy] = W2S(GACHA.tx*T+12, GACHA.ty*T-24);
+      bubble(sx, sy, "🎁 ガチャポン（100ベル）", sc, true);
     }
   }
   const dsh = dogSheet();
@@ -3572,6 +3859,7 @@ function drawMinimap(wpx, hpx){
   uictx.font = `${Math.max(20, mw*0.13)}px sans-serif`;
   uictx.fillText("🫛", mx+(STALL.tx+1)*3*scl, my+(STALL.ty+0.5)*3*scl);
   uictx.fillText("🏁", mx+(RACEGATE.tx+1.5)*3*scl, my+(RACEGATE.ty)*3*scl);
+  uictx.fillText("🎰", mx+(PACHINKO.tx+2)*3*scl, my+(PACHINKO.ty+1.5)*3*scl);
   uictx.fillText("🎣", mx+40*3*scl, my+114*3*scl);
   uictx.fillText("🌸", mx+11*3*scl, my+145*3*scl);
   /* いまここ（点滅） */
@@ -3728,6 +4016,7 @@ window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundIte
   setBreed:(b)=>{ dogBreed = b; }, getBreed:()=>dogBreed, DOG_BREEDS, openNamePanel,
   setWeather:(w)=>{ weather = w; }, getWeather:()=>weather, placedFurn, furnInv, fashionOwned,
   getTut:()=>tutStep, tutDone,
+  openPachinko, pachiTap, pachiRetry, playGacha, getPachi:()=>pachi,
   get careScore(){ return careScore; },
   get rankInfo(){ return rankInfo; },
   toggleMap:()=>{ mapOpen = !mapOpen; },
