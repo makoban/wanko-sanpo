@@ -760,6 +760,50 @@ const BUG_ICON = {"モンシロチョウ":"monshiro","モンキチョウ":"monki
   "ミツバチ":"mitsubachi","トンボ":"tonbo","ホタル":"hotaru"};
 const icn = (cat,f)=>`<img class="icn" src="sprites/items/${cat}/${f}.png" alt="" onerror="this.remove()">`;
 
+/* ================= きせかえ・家具（v6） ================= */
+const FASHION_DEFS = [
+  ["kubiwa-heart","ハートの首輪",300,"neck","#ff5f8f"], ["kubiwa-hoshi","星の首輪",300,"neck","#ffd166"],
+  ["kubiwa-gold","金の首輪",1200,"neck","#e8b93e"],     ["ribbon-tie","リボンタイ",400,"neck","#e0648d"],
+  ["muffler","マフラー",600,"neck","#e0575f"],
+  ["lead-ao","青いリード",500,"lead","#5b8dd6"], ["lead-hana","花がらリード",800,"lead","#f088a8"],
+  ["lead-gold","金のリード",1500,"lead","#e8b93e"],
+  ["beret","ベレーぼう",600,"head"], ["cap","キャップ",500,"head"], ["silkhat","シルクハット",900,"head"],
+  ["hanakanmuri","花かんむり",700,"head"], ["usamimi","うさみみ",800,"head"], ["megane","丸めがね",400,"head"],
+  ["headphone","ヘッドホン",900,"head"], ["tanken","たんけんぼう",700,"head"], ["santa","サンタぼう",800,"head"],
+  ["tonakai","トナカイの角",800,"head"],
+  ["parka","パーカー",900,"body"], ["raincoat","レインコート",800,"body"], ["yukata","ゆかた",1200,"body"],
+  ["tenshi","天使のはね",1500,"body"], ["ukiwa","うきわ",600,"body"],
+  ["kigurumi-dino","きぐるみ恐竜",2000,"body"], ["ryuck","ちいさなリュック",700,"body"]
+];
+const FURN_DEFS = [
+  ["inugoya-aka","赤い犬小屋",1200], ["inugoya-ao","青い犬小屋",1200], ["bench-shiro","白いベンチ",800],
+  ["hanadan","レンガの花だん",600], ["planter","プランター",300], ["parasol","パラソル",900],
+  ["buranko","ブランコ",1500], ["suberidai","すべり台",1500], ["seesaw-kids","シーソー",1200],
+  ["sunaba","すな場",800], ["ido","井戸",1000], ["fusha","風車",2000],
+  ["kakashi","かかし",500], ["kanban","立て看板",300], ["post","ゆうびんポスト",800],
+  ["tent","テント",1800], ["takibi","たき火",700], ["tourou","石とうろう",900],
+  ["shishiodoshi","ししおどし",1000], ["minifountain","ミニふんすい",2500],
+  ["torigoya","小鳥小屋",900], ["flag","はた",400], ["arch","木のアーチ",1200],
+  ["koinobori","こいのぼり",1000], ["yukidaruma","雪だるま",600]
+];
+let accessory = null;          /* 犬が身につけている きせかえ */
+const fashionOwned = {};       /* もっている きせかえ */
+const furnInv = {};            /* もっている 家具 */
+const placedFurn = [];         /* おいた家具 {n,tx,ty} */
+let placing = null;            /* 配置モード中の家具名 */
+const FURN_IMG = {};
+function furnImg(n){
+  if(!FURN_IMG[n]){ const im = new Image(); im.src = "sprites/items/furniture/"+n+".png"; FURN_IMG[n] = im; }
+  return FURN_IMG[n];
+}
+const FASHION_IMG = {};
+function fashionImg(n){
+  if(!FASHION_IMG[n]){ const im = new Image(); im.src = "sprites/items/fashion/"+n+".png"; FASHION_IMG[n] = im; }
+  return FASHION_IMG[n];
+}
+const accDef = ()=> FASHION_DEFS.find(f=>f[0]===accessory);
+const leashColor = ()=>{ const d = accDef(); return (d && d[3]==="lead") ? d[4] : "#c9575c"; };
+
 /* ================= もちもの・セーブ ================= */
 let bells = 0, hasBall = false, bandana = null, petCount = 0;
 let playerName = "", dogName = "", raceWins = 0, dogBreed = "shiba";
@@ -838,6 +882,7 @@ function doSave(){
     for(const v of VILLAGERS) love[v.key] = v.love;
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       bells, hasBall, bandana, petCount, playerName, dogName, raceWins, dogBreed,
+      accessory, fashionOwned, furnInv, placedFurn,
       foodStock, medCount, care, poops, savedAt: Date.now(),
       careScore, playerId, lastPlayDay, spirit,
       apple:pocket.apple, fossil:pocket.fossil,
@@ -856,6 +901,10 @@ function loadSave(){
     petCount = d.petCount||0;
     playerName = d.playerName||""; dogName = d.dogName||"";
     raceWins = d.raceWins||0; dogBreed = d.dogBreed||"shiba";
+    accessory = d.accessory||null;
+    Object.assign(fashionOwned, d.fashionOwned||{});
+    Object.assign(furnInv, d.furnInv||{});
+    if(Array.isArray(d.placedFurn)) placedFurn.push(...d.placedFurn.slice(0,60));
     careScore = d.careScore||0; playerId = d.playerId||""; lastPlayDay = d.lastPlayDay||"";
     if(d.spirit != null) spirit = clamp(d.spirit, 0, 100);
     foodStock = d.foodStock||0; medCount = d.medCount||0;
@@ -1451,7 +1500,35 @@ function tryAction(){
     }
     return;
   }
+  /* 家具の配置モード */
+  if(placing){
+    const [dx,dy] = dirVec();
+    const tx = Math.floor(player.x/T)+dx, ty = Math.floor(player.y/T)+dy;
+    const ok = tx>=0 && ty>=0 && tx<MW && ty<MH && !solid[ty][tx]
+      && ["g","f","p"].includes(ground[ty][tx])
+      && !placedFurn.some(p=>p.tx===tx && p.ty===ty);
+    if(ok){
+      placedFurn.push({n:placing, tx, ty});
+      furnInv[placing]--;
+      placing = null;
+      popSound(); addCare(2); markSave();
+      floatTexts.push({x:tx*T+12, y:ty*T-6, text:"おいた！✨", t:1.4});
+    }else{
+      floatTexts.push({x:player.x, y:player.y-20, text:"ここには おけない…", t:1.2});
+    }
+    return;
+  }
   const cands = [];
+  /* おいた家具（かたづける） */
+  for(const pf of placedFurn){
+    const d = dist(player.x,player.y, pf.tx*T+12, pf.ty*T+12);
+    if(d < 30) cands.push({d:d*1.1, f:()=>{
+      furnInv[pf.n] = (furnInv[pf.n]||0)+1;
+      placedFurn.splice(placedFurn.indexOf(pf),1);
+      popSound(); markSave();
+      floatTexts.push({x:player.x, y:player.y-20, text:"かたづけた！", t:1.2});
+    }});
+  }
   /* 住民 */
   for(const v of VILLAGERS){
     if(!vActive(v)) continue;
@@ -1755,7 +1832,22 @@ function openShop(){
     <div class="row"><span class="nm">${icn("food","dogfood")}ドッグフード（10食）<br><small class="muted">🍖ボタン／Fキーでごはんをあげよう</small></span>
       <button data-buy="food" ${bells>=300?"":"disabled"}>300ベル</button></div>
     <div class="row"><span class="nm">${icn("care","kusuri")}お薬<br><small class="muted">病気のとき🐾ボタンであげる</small></span>
-      <button data-buy="med" ${bells>=200?"":"disabled"}>200ベル</button></div>`;
+      <button data-buy="med" ${bells>=200?"":"disabled"}>200ベル</button></div>
+    <h3>🎀 きせかえ（買って、つける）</h3>
+    ${FASHION_DEFS.map(([id,nm,pr])=>{
+      const own = fashionOwned[id], on = accessory===id;
+      return `<div class="row"><span class="nm">${icn("fashion",id)}${nm}</span>
+        <button data-${own?"fwear":"fbuy"}="${id}" ${own||bells>=pr?"":"disabled"}>${own ? (on?"はずす":"つける") : pr+"ベル"}</button></div>`;
+    }).join("")}
+    <h3>🪑 家具（買って、町におく）</h3>
+    ${FURN_DEFS.map(([id,nm,pr])=>{
+      const cnt = furnInv[id]||0;
+      return `<div class="row"><span class="nm">${icn("furniture",id)}${nm}${cnt?` <small class="muted">×${cnt}</small>`:""}</span>
+        <span style="display:flex;gap:6px;">
+        ${cnt?`<button data-fplace="${id}">おく</button>`:""}
+        <button data-fbuyf="${id}" ${bells>=pr?"":"disabled"}>${pr}ベル</button></span></div>`;
+    }).join("")}
+    <div class="row"><span class="nm"><small class="muted">おいた家具はタップ／スペースでかたづけられるよ</small></span></div>`;
   shopPanel.style.display = "block";
 }
 shopPanel.addEventListener("click", e=>{
@@ -1765,7 +1857,7 @@ shopPanel.addEventListener("click", e=>{
     const k = t.dataset.sell;
     if(k==="apple"){ bells += pocket.apple*100; pocket.apple = 0; }
     if(k==="fossil"){ bells += pocket.fossil*500; pocket.fossil = 0; }
-    if(k==="fish"){ bells += FISH_DEFS.reduce((a,f)=>a+(fishInv[f.name]||0)*f.price,0); for(const f of FISH_DEFS) fishInv[f.name]=0; }
+    if(k==="fish"){ bells += ALL_FISH.reduce((a,f)=>a+(fishInv[f.name]||0)*f.price,0); for(const f of ALL_FISH) fishInv[f.name]=0; }
     if(k==="bug"){ bells += BUG_DEFS.reduce((a,b)=>a+(bugInv[b.name]||0)*b.price,0); for(const b of BUG_DEFS) bugInv[b.name]=0; }
     coinSfx(); markSave(); openShop();
   }
@@ -1786,6 +1878,27 @@ shopPanel.addEventListener("click", e=>{
     if(k==="food" && bells>=300){ bells-=300; foodStock+=10; popSound(); updateFeedBtn(); }
     if(k==="med" && bells>=200){ bells-=200; medCount++; popSound(); }
     markSave(); openShop();
+  }
+  /* きせかえ：買う・つける／はずす */
+  if(t.dataset.fbuy){
+    const d = FASHION_DEFS.find(f=>f[0]===t.dataset.fbuy);
+    if(d && bells>=d[2]){ bells-=d[2]; fashionOwned[d[0]]=true; accessory=d[0]; jingle(); markSave(); openShop(); }
+  }
+  if(t.dataset.fwear){
+    accessory = accessory===t.dataset.fwear ? null : t.dataset.fwear;
+    popSound(); markSave(); openShop();
+  }
+  /* 家具：買う・おく */
+  if(t.dataset.fbuyf){
+    const d = FURN_DEFS.find(f=>f[0]===t.dataset.fbuyf);
+    if(d && bells>=d[2]){ bells-=d[2]; furnInv[d[0]]=(furnInv[d[0]]||0)+1; coinSfx(); markSave(); openShop(); }
+  }
+  if(t.dataset.fplace){
+    if((furnInv[t.dataset.fplace]||0) > 0){
+      placing = t.dataset.fplace;
+      closePanels();
+      floatTexts.push({x:player.x, y:player.y-24, text:"おきたい場所でタップ／スペース！", t:2.4});
+    }
   }
 });
 function toggleBook(){
@@ -1819,6 +1932,8 @@ function toggleBook(){
     <div class="row"><span class="nm">💗 なでなで</span><span>${petCount}</span></div>
     <div class="row"><span class="nm">🏁 レース優勝</span><span>${raceWins}回</span></div>
     <div class="row"><span class="nm">🐕 ${dName()}</span><span>${breedLabel()} ・ ${({puppy:"子犬",adult:"大人",senior:"シニア"})[care.stage]} ・ 育ち度 ${care.growth}</span></div>
+    <div class="row"><span class="nm">🎀 きせかえ</span><span>${Object.keys(fashionOwned).length}／${FASHION_DEFS.length}こ${accessory?` ・ 装備中：${(accDef()||[,""])[1]}`:""}</span></div>
+    <div class="row"><span class="nm">🪑 おいた家具</span><span>${placedFurn.length}こ</span></div>
     <div class="row"><span class="nm">🏘 町の住民</span><span>${VILLAGERS.filter(v=>!v.tourist && vActive(v)).length}人／${VILLAGERS.filter(v=>!v.tourist).length}人 <small class="muted">（元気度で増える）</small></span></div>
     <div class="row"><span class="nm">⏰ 前のお散歩から</span><span>${fmtAbsence(lastAbsenceH)}</span></div>
     <div class="row"><span class="nm">🏅 お世話指数</span><span class="bells">${careScore}${rankInfo&&rankInfo.rank?`（${rankInfo.rank}位/${rankInfo.total}人）`:""}</span></div>
@@ -2795,6 +2910,20 @@ function drawDog(){
       ctx.fillStyle = bandana;
       ctx.fillRect(Math.round(dog.x-6), Math.round(dog.y - fr.h*0.45) - jump, 12, 4);
     }
+    /* きせかえ */
+    const ad = accDef();
+    if(ad){
+      if(ad[3]==="neck"){
+        ctx.fillStyle = ad[4];
+        ctx.fillRect(Math.round(dog.x-6), Math.round(dog.y - fr.h*0.42) - jump, 12, 3);
+      }else if(ad[3]!=="lead"){
+        const im = fashionImg(ad[0]);
+        if(im.complete && im.naturalWidth){
+          const s = 16, bob = Math.round(Math.sin(time*2.2)*1);
+          ctx.drawImage(im, Math.round(dog.x - s/2), dy - s + 2 + bob, s, Math.round(s*im.height/im.width));
+        }
+      }
+    }
     drawDogIcon();
     return;
   }
@@ -2819,7 +2948,7 @@ function drawLeash(){
   const hx = player.x + (player.dir==="left"?-9:player.dir==="right"?9:0);
   const hy = player.y - 8;
   const nx = dog.x + (dog.face==="r"?9:-9), ny = dog.y - 12;
-  ctx.strokeStyle = "#c9575c"; ctx.lineWidth = 2;
+  ctx.strokeStyle = leashColor(); ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(Math.round(hx)+.5, Math.round(hy)+.5);
   ctx.quadraticCurveTo((hx+nx)/2, Math.max(hy,ny)+8, Math.round(nx)+.5, Math.round(ny)+.5);
@@ -2971,6 +3100,15 @@ function drawWorld(){
     }});
   }
   for(const v of VILLAGERS){ if(vActive(v)) items.push({y:v.y+3, f:()=>drawVillager(v)}); }
+  /* おいた家具 */
+  for(const pf of placedFurn){
+    items.push({y:(pf.ty+1)*T, f:()=>{
+      const im = furnImg(pf.n);
+      if(im.complete && im.naturalWidth){
+        ctx.drawImage(im, Math.round(pf.tx*T+12-im.width/2), Math.round((pf.ty+1)*T-im.height));
+      }
+    }});
+  }
   for(const pp of poops){
     items.push({y:pp.y+2, f:()=>{
       if(POOPIMG.complete && POOPIMG.naturalWidth){
