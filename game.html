@@ -864,7 +864,7 @@ function tutDone(n){
 
 /* ================= もちもの・セーブ ================= */
 let bells = 0, hasBall = false, bandana = null, petCount = 0;
-let playerName = "", dogName = "", raceWins = 0, dogBreed = "shiba";
+let playerName = "", dogName = "", raceWins = 0, dogBreed = "shiba", promised = false;
 /* --- おせわ指数（オンラインランキング） --- */
 const RANK_API = "https://wanko-rank.ai-fudosan.workers.dev";
 let careScore = 0, playerId = "", lastPlayDay = "";
@@ -942,7 +942,7 @@ function doSave(){
       bells, hasBall, bandana, petCount, playerName, dogName, raceWins, dogBreed,
       accessory, fashionOwned, furnInv, placedFurn,
       foodStock, medCount, care, poops, savedAt: Date.now(),
-      careScore, playerId, lastPlayDay, spirit, tut: tutStep,
+      careScore, playerId, lastPlayDay, spirit, tut: tutStep, promised,
       apple:pocket.apple, fossil:pocket.fossil,
       fishInv, bugInv,
       caughtFish:[...caughtFish], caughtBug:[...caughtBug],
@@ -966,6 +966,7 @@ function loadSave(){
     careScore = d.careScore||0; playerId = d.playerId||""; lastPlayDay = d.lastPlayDay||"";
     if(d.spirit != null) spirit = clamp(d.spirit, 0, 100);
     tutStep = d.tut != null ? d.tut : (d.playerName ? 99 : 0);   /* 既存プレイヤーはスキップ */
+    promised = d.promised != null ? d.promised : !!d.playerName;  /* 名前登録ずみなら約束ずみ扱い */
     foodStock = d.foodStock||0; medCount = d.medCount||0;
     if(d.care) Object.assign(care, d.care);
     if(!playerName) care.stage = "puppy";               /* はじめてなら こいぬから */
@@ -3944,15 +3945,17 @@ document.addEventListener("visibilitychange", ()=>{
   if(document.visibilityState === "hidden" && saveDirty) doSave();
 });
 
-/* --- あそぶまえの おやくそく（まいかい ひょうじ） --- */
+/* --- あそぶまえの おやくそく（初回のみ表示） --- */
 (function(){
   const pp = document.getElementById("promisePanel");
+  if(promised){ pp.style.display = "none"; return; }   /* 約束ずみなら出さない */
   if(dogName){
     document.getElementById("promiseWait").textContent =
       dogName + "は、今日もあなたを待っていました。";
   }
   document.getElementById("promiseOk").addEventListener("click", ()=>{
     pp.style.display = "none";
+    promised = true; markSave(); doSave();
     try{ jingle(); }catch(e){}
   });
   document.getElementById("promiseNo").addEventListener("click", ()=>{
