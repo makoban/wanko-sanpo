@@ -248,6 +248,13 @@
     <div id="cafePanel" class="panel"></div>
     <div id="pachiPanel" class="panel"></div>
     <div id="casinoPanel" class="panel"></div>
+    <div id="updatePanel" class="panel" style="inset:auto 8%; top:12%; z-index:45;">
+      <h2>🆕 アップデートしました！ <small id="updVer" class="muted"></small></h2>
+      <div id="updBody"></div>
+      <div style="text-align:center; margin-top:12px;">
+        <button id="updOk">あそぶ！</button>
+      </div>
+    </div>
     <div id="namePanel" class="panel">
       <h2>🐾 名前を教えてね</h2>
       <div class="name-row">
@@ -288,6 +295,13 @@
 <script>
 "use strict";
 /* ================= 基本セットアップ ================= */
+/* ================= バージョン（更新のたびに上げる＋内容を書く） ================= */
+const GAME_VER = "1.9.0";
+const UPDATE_NOTES = [
+  "🎲 わんわんカジノOPEN！（スロット777・ハイ&ロー・ダービー）",
+  "🎰 ぽちんこがコース制に（かけ金3種・最大配当10倍）",
+  "🛍 お買いもの・お薬・ごはんの案内メッセージを追加"
+];
 const T = 24, MW = 80, MH = 192;     /* 5倍のひろさの街（森・広場・果樹園・大きな湖・海） */
 let VW = 320, VH = 240;
 const cvs = document.getElementById("game");
@@ -871,7 +885,7 @@ function tutDone(n){
 
 /* ================= もちもの・セーブ ================= */
 let bells = 0, hasBall = false, bandana = null, petCount = 0;
-let playerName = "", dogName = "", raceWins = 0, dogBreed = "shiba", promised = false;
+let playerName = "", dogName = "", raceWins = 0, dogBreed = "shiba", promised = false, lastSeenVer = "";
 /* --- おせわ指数（オンラインランキング） --- */
 const RANK_API = "https://wanko-rank.ai-fudosan.workers.dev";
 let careScore = 0, playerId = "", lastPlayDay = "";
@@ -949,7 +963,7 @@ function doSave(){
       bells, hasBall, bandana, petCount, playerName, dogName, raceWins, dogBreed,
       accessory, fashionOwned, furnInv, placedFurn,
       foodStock, medCount, care, poops, savedAt: Date.now(),
-      careScore, playerId, lastPlayDay, spirit, tut: tutStep, promised,
+      careScore, playerId, lastPlayDay, spirit, tut: tutStep, promised, lastSeenVer,
       apple:pocket.apple, fossil:pocket.fossil,
       fishInv, bugInv,
       caughtFish:[...caughtFish], caughtBug:[...caughtBug],
@@ -974,6 +988,7 @@ function loadSave(){
     if(d.spirit != null) spirit = clamp(d.spirit, 0, 100);
     tutStep = d.tut != null ? d.tut : (d.playerName ? 99 : 0);   /* 既存プレイヤーはスキップ */
     promised = d.promised != null ? d.promised : !!d.playerName;  /* 名前登録ずみなら約束ずみ扱い */
+    lastSeenVer = d.lastSeenVer || "";
     foodStock = d.foodStock||0; medCount = d.medCount||0;
     if(d.care) Object.assign(care, d.care);
     if(!playerName) care.stage = "puppy";               /* はじめてなら こいぬから */
@@ -4286,6 +4301,12 @@ function drawUI(){
   uictx.fillStyle = "#a8762e";
   uictx.fillText(label3, 7*csc, 30.2*csc);
 
+  /* バージョン表示（左下すみ） */
+  uictx.font = `${Math.max(9, 3*csc)}px sans-serif`;
+  uictx.fillStyle = "rgba(120,90,70,0.55)";
+  uictx.textBaseline = "middle";
+  uictx.fillText("v" + GAME_VER, 5*csc, hpx - 3.2*csc);
+
   /* チュートリアルガイド（初回のみ） */
   if(tutStep < TUT_STEPS.length && !dialog && !fishing && !farewell){
     const st = TUT_STEPS[tutStep];
@@ -4512,6 +4533,33 @@ document.addEventListener("visibilitychange", ()=>{
     location.href = "./index.html";
   });
 })();
+/* --- アップデートのお知らせ（バージョンが変わった時だけ・1回） --- */
+(function(){
+  if(playerName && lastSeenVer !== GAME_VER){
+    const up = document.getElementById("updatePanel");
+    document.getElementById("updVer").textContent = "v" + GAME_VER;
+    document.getElementById("updBody").innerHTML =
+      UPDATE_NOTES.map(n=>`<div class="row"><span class="nm">${n}</span></div>`).join("");
+    up.style.display = "block";
+    document.getElementById("updOk").addEventListener("click", ()=>{
+      up.style.display = "none";
+      lastSeenVer = GAME_VER; markSave(); doSave();
+      jingle();
+    });
+  }else if(lastSeenVer !== GAME_VER){
+    lastSeenVer = GAME_VER; markSave();   /* 新規さんはお知らせなしで記録だけ */
+  }
+})();
+/* --- 新バージョン検知：キャッシュを無視して確実にのりかえる --- */
+setTimeout(()=>{
+  fetch("game.html", { cache: "no-store" }).then(r=>r.text()).then(t=>{
+    const m = t.match(/GAME_VER\s*=\s*"([^"]+)"/);
+    if(m && m[1] !== GAME_VER){
+      doSave();
+      location.replace("game.html?u=" + Date.now());   /* ユニークURLでキャッシュ回避 */
+    }
+  }).catch(()=>{});
+}, 2500);
 document.body.classList.toggle("hasball", hasBall);
 updateFeedBtn();
 if(!playerName){
