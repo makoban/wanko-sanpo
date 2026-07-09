@@ -246,6 +246,8 @@
     <div id="shopPanel" class="panel"></div>
     <div id="bookPanel" class="panel"></div>
     <div id="cafePanel" class="panel"></div>
+    <div id="pachiPanel" class="panel"></div>
+    <div id="casinoPanel" class="panel"></div>
     <div id="namePanel" class="panel">
       <h2>🐾 名前を教えてね</h2>
       <div class="name-row">
@@ -344,7 +346,7 @@ window.addEventListener("keydown", e=>{
   if((e.key==="f" || e.key==="F") && !dialog && !fishing && !race) feedDog();
   if(e.key==="x" || e.key==="X") dogAction();
   if((e.key==="m" || e.key==="M") && !race && !farewell){ mapOpen = !mapOpen; mapOpen ? uiOpen() : uiClose(); }
-  if(e.key==="Escape"){ closePanels(); mapOpen = false; if(race) race = null; if(pachi){ pachi = null; } }
+  if(e.key==="Escape"){ closePanels(); mapOpen = false; if(race) race = null; if(pachi) pachi = null; if(slot) slot = null; if(derby) derby = null; }
   keys[e.key] = true;
   if(e.key.length===1) keys[e.key.toLowerCase()] = true;
   initAudio();
@@ -383,10 +385,12 @@ stage.addEventListener("touchstart", e=>{
   if(race){ actPressed = true; e.preventDefault(); return; }
   /* ぽちんこちゅうは タップ＝玉を落とす */
   if(pachi){ pachiTap(); e.preventDefault(); return; }
+  if(slot){ slotTap(); e.preventDefault(); return; }
+  if(derby){ derbyTap(); e.preventDefault(); return; }
   /* ちずが ひらいていたら とじる */
   if(mapOpen){ mapOpen = false; uiClose(); e.preventDefault(); return; }
   /* パネルが ひらいているとき、そとをタップしたら とじるだけ */
-  if(shopPanel.style.display==="block" || bookPanel.style.display==="block" || document.getElementById("racePanel").style.display==="block" || document.getElementById("cafePanel").style.display==="block"){
+  if(["shopPanel","bookPanel","racePanel","cafePanel","pachiPanel","casinoPanel"].some(id=>document.getElementById(id).style.display==="block")){
     closePanels();
     e.preventDefault();
     return;
@@ -624,7 +628,9 @@ const TOWN = {};
  "hana-shiore","hana-tsubomi","hana-mankai","hana-hikari",
  "kusa-kare","zassou","mizutamari","ochiba","clover","kirakusa",
  /* v8：あそびばストリート */
- "pachinko-hall","gacha-stand","onsen","cafe"].forEach(n=>{
+ "pachinko-hall","gacha-stand","onsen","cafe",
+ /* v9：カジノ */
+ "casino"].forEach(n=>{
   const im = new Image();
   im.onload = ()=>{ TOWN[n] = im; };
   im.src = "sprites/town/" + n + ".png";
@@ -1121,6 +1127,9 @@ const ONSEN = { tx:62, ty:48 };
 for(let y=49;y<52;y++) for(let x=62;x<66;x++) solid[y][x]=true;
 const CAFE = { tx:62, ty:55 };
 for(let y=56;y<59;y++) for(let x=62;x<66;x++) solid[y][x]=true;
+/* わんわんカジノ（v9） */
+const CASINO = { tx:62, ty:64 };
+for(let y=65;y<68;y++) for(let x=62;x<66;x++) solid[y][x]=true;
 
 /* ミニマップ（地形を1回だけ描いておく） */
 let MINI = null;
@@ -1575,6 +1584,8 @@ function digAt(spot){
 }
 function tryAction(){
   if(pachi){ pachiTap(); return; }
+  if(slot){ slotTap(); return; }
+  if(derby){ derbyTap(); return; }
   if(dialog){
     if(dialog.chars < dialog.text.length){ dialog.chars = dialog.text.length; }
     else dialog = null;
@@ -1661,6 +1672,11 @@ function tryAction(){
     const d = dist(player.x,player.y, (CAFE.tx+2)*T, (CAFE.ty+3.6)*T);
     if(d < 56) cands.push({d:d*0.85, f:openCafe});
   }
+  /* わんわんカジノ */
+  {
+    const d = dist(player.x,player.y, (CASINO.tx+2)*T, (CASINO.ty+3.6)*T);
+    if(d < 56) cands.push({d:d*0.85, f:openCasino});
+  }
   /* むし */
   for(const b of bugs){
     const d = dist(player.x,player.y, b.x,b.y);
@@ -1717,6 +1733,7 @@ function tryAction(){
 /* 🐾ボタン専用：わんこへのアクション（かんびょう / なでる / とおくなら よぶ） */
 function dogAction(){
   if(pachi){ pachiRetry(); return; }
+  if(slot || derby) return;
   if(dialog || race || farewell || fishing || mapOpen) return;
   const d = dist(player.x, player.y, dog.x, dog.y);
   if(d >= 50){
@@ -1731,7 +1748,7 @@ function dogAction(){
     care.sick = false; care.sickT = 0; care.hungryT = 0; care.poopT = 0;
     care.hunger = Math.max(care.hunger, 55);
     jingle();
-    floatTexts.push({x:dog.x, y:dog.y-28, text:`${dName()}は元気になった！`, t:2.2});
+    popup = { text:`💊 お薬を1つ使った（のこり${medCount}こ）— ${dName()}は元気になった！`, t:3.2 };
     addCare(5);
     dog.happyT = 2; dog.jumpT = 0.45;
     for(let i=0;i<3;i++) hearts.push({x:dog.x+(Math.random()*20-10), y:dog.y-15-i*4, vy:-(21+Math.random()*15), life:1.3});
@@ -1753,9 +1770,12 @@ function dogAction(){
 const shopPanel = document.getElementById("shopPanel");
 const bookPanel = document.getElementById("bookPanel");
 function closePanels(){
-  const rp = document.getElementById("racePanel"), cp = document.getElementById("cafePanel");
-  if(shopPanel.style.display==="block" || bookPanel.style.display==="block" || rp.style.display==="block" || cp.style.display==="block") uiClose();
-  shopPanel.style.display = "none"; bookPanel.style.display = "none"; rp.style.display = "none"; cp.style.display = "none";
+  const ids = ["racePanel","cafePanel","pachiPanel","casinoPanel"];
+  let any = shopPanel.style.display==="block" || bookPanel.style.display==="block";
+  for(const id of ids) any = any || document.getElementById(id).style.display==="block";
+  if(any) uiClose();
+  shopPanel.style.display = "none"; bookPanel.style.display = "none";
+  for(const id of ids) document.getElementById(id).style.display = "none";
 }
 /* --- なまえ入力パネル --- */
 const namePanel = document.getElementById("namePanel");
@@ -1987,30 +2007,34 @@ shopPanel.addEventListener("click", e=>{
       if(ground[ty][tx]==="g"){ ground[ty][tx]="f"; bells-=100; popSound(); floatTexts.push({x:player.x,y:player.y-16,text:"🌷 花がさいた！",t:1.6}); }
       else floatTexts.push({x:player.x,y:player.y-16,text:"ここには植えられない…",t:1.4});
     }
-    if(k==="b_red" && bells>=300){ bells-=300; bandana="#e0575f"; popSound(); }
-    if(k==="b_blue" && bells>=300){ bells-=300; bandana="#5b8dd6"; popSound(); }
+    if(k==="b_red" && bells>=300){ bells-=300; bandana="#e0575f"; popSound(); popup = { text:`🧣 赤いバンダナを買って${dName()}につけた！`, t:2.6 }; }
+    if(k==="b_blue" && bells>=300){ bells-=300; bandana="#5b8dd6"; popSound(); popup = { text:`🧣 空色バンダナを買って${dName()}につけた！`, t:2.6 }; }
     if(k==="ball" && !hasBall && bells>=500){
       bells-=500; hasBall=true; jingle();
       document.body.classList.add("hasball");
       popup = { text:"🎾ボタンでボールを投げよう！ 向いている方に飛ぶよ", t:4.5 };
     }
-    if(k==="food" && bells>=300){ bells-=300; foodStock+=10; popSound(); updateFeedBtn(); }
-    if(k==="med" && bells>=200){ bells-=200; medCount++; popSound(); }
+    if(k==="food" && bells>=300){ bells-=300; foodStock+=10; popSound(); updateFeedBtn(); popup = { text:`🥫 ドッグフードを買った！（もちもの：${foodStock}食）`, t:2.8 }; }
+    if(k==="med" && bells>=200){ bells-=200; medCount++; popSound(); popup = { text:`💊 お薬を買った！（もちもの：${medCount}こ）病気のとき🐾ボタンで使うよ`, t:3.4 }; }
     markSave(); openShop();
   }
   /* きせかえ：買う・つける／はずす */
   if(t.dataset.fbuy){
     const d = FASHION_DEFS.find(f=>f[0]===t.dataset.fbuy);
-    if(d && bells>=d[2]){ bells-=d[2]; fashionOwned[d[0]]=true; accessory=d[0]; jingle(); markSave(); openShop(); }
+    if(d && bells>=d[2]){ bells-=d[2]; fashionOwned[d[0]]=true; accessory=d[0]; jingle(); popup = { text:`🎀 「${d[1]}」を買って${dName()}につけた！`, t:2.8 }; markSave(); openShop(); }
   }
   if(t.dataset.fwear){
-    accessory = accessory===t.dataset.fwear ? null : t.dataset.fwear;
-    popSound(); markSave(); openShop();
+    const wd = FASHION_DEFS.find(f=>f[0]===t.dataset.fwear);
+    const wasOn = accessory===t.dataset.fwear;
+    accessory = wasOn ? null : t.dataset.fwear;
+    popSound();
+    floatTexts.push({x:player.x, y:player.y-24, text: wasOn ? `「${wd[1]}」をはずした` : `「${wd[1]}」をつけた！`, t:1.6});
+    markSave(); openShop();
   }
   /* 家具：買う・おく */
   if(t.dataset.fbuyf){
     const d = FURN_DEFS.find(f=>f[0]===t.dataset.fbuyf);
-    if(d && bells>=d[2]){ bells-=d[2]; furnInv[d[0]]=(furnInv[d[0]]||0)+1; coinSfx(); markSave(); openShop(); }
+    if(d && bells>=d[2]){ bells-=d[2]; furnInv[d[0]]=(furnInv[d[0]]||0)+1; coinSfx(); popup = { text:`🪑 「${d[1]}」を買った！「おく」ボタンで町に置けるよ`, t:3 }; markSave(); openShop(); }
   }
   if(t.dataset.fplace){
     if((furnInv[t.dataset.fplace]||0) > 0){
@@ -2077,9 +2101,35 @@ let pachi = null;
 const PACHI_COST = 100, PACHI_BALLS = 5;
 const PACHI_PAY = [0, 10, 30, 180, 30, 10, 0];   /* 7ポケット・中央★が大当たり（実測還元率≒92%） */
 function openPachinko(){
-  if(bells < PACHI_COST){ floatTexts.push({x:player.x, y:player.y-20, text:`${PACHI_COST}ベルが必要…`, t:1.5}); return; }
-  bells -= PACHI_COST; markSave();
   uiOpen();
+  shopPanel.style.display = "none"; bookPanel.style.display = "none";
+  const pp = document.getElementById("pachiPanel");
+  pp.innerHTML = `
+    <button class="close" data-close="1">✕</button>
+    <h2>🎰 ぽちんこホール</h2>
+    <div>持っているベル：<span class="bells">🔔 ${bells}</span></div>
+    <h3>コースをえらぶ（玉5個・ポケットに入るとベル）</h3>
+    <div class="row"><span class="nm">おためしコース<br><small class="muted">大当たり ★180ベル</small></span>
+      <button data-pcourse="100" ${bells>=100?"":"disabled"}>100ベル</button></div>
+    <div class="row"><span class="nm">レギュラーコース<br><small class="muted">配当3倍！ 大当たり ★540ベル</small></span>
+      <button data-pcourse="300" ${bells>=300?"":"disabled"}>300ベル</button></div>
+    <div class="row"><span class="nm">ごうかコース<br><small class="muted">配当10倍！！ 大当たり ★1800ベル</small></span>
+      <button data-pcourse="1000" ${bells>=1000?"":"disabled"}>1000ベル</button></div>`;
+  pp.style.display = "block";
+}
+document.getElementById("pachiPanel").addEventListener("click", e=>{
+  const t = e.target;
+  if(t.dataset.close){ closePanels(); return; }
+  if(t.dataset.pcourse){
+    const cost = +t.dataset.pcourse;
+    if(bells < cost) return;
+    closePanels();
+    startPachi(cost);
+  }
+});
+function startPachi(cost){
+  bells -= cost; markSave();
+  popup = { text:`🎰 −${cost}ベルはらった！ 玉5個、★ポケットをねらえ！`, t:2.8 };
   const FW = Math.min(VW*0.92, 320), FH = Math.min(VH*0.72, 430);
   const fx = (VW-FW)/2, fy = VH*0.09;
   const pins = [];
@@ -2092,6 +2142,7 @@ function openPachinko(){
   pins.push({x: fx + FW/2 - FW/22, y: fy + FH - 32});
   pins.push({x: fx + FW/2 + FW/22, y: fy + FH - 32});
   pachi = { FW, FH, fx, fy, pins, balls: PACHI_BALLS, won: 0, ball: null,
+            cost, mult: cost/100,
             state: "aim", flash: 0, lastPin: 0, resultMsg: "" };
 }
 function pachiTap(){
@@ -2108,8 +2159,9 @@ function pachiTap(){
   }
 }
 function pachiRetry(){
-  if(!pachi || pachi.state !== "result" || bells < PACHI_COST) return;
-  bells -= PACHI_COST; markSave();
+  if(!pachi || pachi.state !== "result" || bells < pachi.cost) return;
+  bells -= pachi.cost; markSave();
+  floatTexts.push({x:player.x, y:player.y-24, text:`−${pachi.cost}ベル！ もう1回！`, t:1.6});
   pachi.balls = PACHI_BALLS; pachi.won = 0; pachi.state = "aim"; pachi.resultMsg = "";
   popSound();
 }
@@ -2140,10 +2192,10 @@ function updatePachi(dt){
   /* ポケット到達 */
   if(b.y > P.fy + P.FH - 20){
     const zone = clamp(Math.floor((b.x - P.fx)/(P.FW/7)), 0, 6);
-    const pay = PACHI_PAY[zone];
+    const pay = PACHI_PAY[zone] * P.mult;
     if(pay > 0){
       bells += pay; P.won += pay; markSave();
-      if(pay >= 180){ fanfare(); P.flash = 1.4; floatTexts.push({x:player.x, y:player.y-30, text:"🌟 FEVER!!", t:2}); }
+      if(PACHI_PAY[zone] >= 180){ fanfare(); P.flash = 1.4; floatTexts.push({x:player.x, y:player.y-30, text:"🌟 FEVER!!", t:2}); }
       else coinSfx();
     }else{
       noiseSfx(0.15, 0.05, 600, 200);
@@ -2152,7 +2204,7 @@ function updatePachi(dt){
     P.ball = null;
     P.state = P.balls > 0 ? "aim" : "result";
     if(P.state === "result"){
-      P.resultMsg = P.won >= PACHI_COST*2 ? "🎉 だいしょうり！" : P.won > 0 ? "また あそんでね♪" : "ざんねん…";
+      P.resultMsg = P.won >= P.cost*2 ? "🎉 だいしょうり！" : P.won >= P.cost ? "😊 プラスで終了！" : P.won > 0 ? "また あそんでね♪" : "ざんねん…";
     }
   }
   if(P.payT > 0) P.payT -= dt;
@@ -2177,12 +2229,12 @@ function drawPachi(){
   /* ポケット */
   const zw = P.FW/7;
   for(let z=0;z<7;z++){
-    const pay = PACHI_PAY[z];
-    ctx.fillStyle = pay>=180 ? "#ffd166" : pay>0 ? "#ffc2d6" : "#d8cbe0";
+    const base = PACHI_PAY[z], pay = base * P.mult;
+    ctx.fillStyle = base>=180 ? "#ffd166" : base>0 ? "#ffc2d6" : "#d8cbe0";
     ctx.fillRect(P.fx+z*zw+2, P.fy+P.FH-18, zw-4, 16);
     ctx.fillStyle = "#4a3228";
     ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(pay>0? (pay>=180?"★"+pay:pay) : "×", P.fx+z*zw+zw/2, P.fy+P.FH-6);
+    ctx.fillText(base>0? (base>=180?"★"+pay:pay) : "×", P.fx+z*zw+zw/2, P.fy+P.FH-6);
     ctx.textAlign = "left";
   }
   /* ピン */
@@ -2225,7 +2277,7 @@ function drawPachiHud(wpx, hpx){
   uictx.fillText("🎰 ぽちんこホール", wpx/2, hpx*0.045);
   uictx.font = `bold ${4.6*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
   uictx.fillStyle = "#fff";
-  uictx.fillText(`玉 ${"●".repeat(P.balls)}${"○".repeat(PACHI_BALLS-P.balls)}　かくとく 🔔${P.won}　もち🔔${bells}`, wpx/2, hpx*0.085);
+  uictx.fillText(`かけ金${P.cost}　玉 ${"●".repeat(P.balls)}${"○".repeat(PACHI_BALLS-P.balls)}　かくとく 🔔${P.won}　もち🔔${bells}`, wpx/2, hpx*0.085);
   uictx.font = `${3.9*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
   uictx.fillStyle = "#e8c9d8";
   if(P.state === "aim") uictx.fillText("タップ／スペースで 玉を落とす！", wpx/2, hpx*0.96);
@@ -2239,7 +2291,7 @@ function drawPachiHud(wpx, hpx){
     uictx.fillText(`かくとく 🔔${P.won}`, wpx/2, hpx*0.485);
     uictx.font = `${3.8*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
     uictx.fillStyle = "#e8c9d8";
-    uictx.fillText(bells >= PACHI_COST ? "🐾ボタン＝もう1回(100ベル)　タップ＝おわる" : "タップで おわる", wpx/2, hpx*0.545);
+    uictx.fillText(bells >= P.cost ? `🐾ボタン＝もう1回(${P.cost}ベル)　タップ＝おわる` : "タップで おわる", wpx/2, hpx*0.545);
   }
   uictx.textAlign = "left";
 }
@@ -2398,6 +2450,365 @@ function playGacha(){
   }, 1000);
 }
 
+/* ================= わんわんカジノ（v9）：スロット777・ハイ&ロー・ダービー ================= */
+const CASINO_IMG = {};
+["casino","slot-frame","sym-7","sym-bell","sym-star","sym-apple","sym-paw","sym-bone",
+ "bigwin","card-back","chip-stack","derby-gate","goal-tape","trophy","kuroe-dealer"].forEach(n=>{
+  const im = new Image();
+  im.onload = ()=>{ CASINO_IMG[n] = im; };
+  im.src = "sprites/items/casino/" + n + ".png";
+});
+let slot = null, derby = null, hilo = null;
+const casinoP = ()=>document.getElementById("casinoPanel");
+function openCasino(){
+  uiOpen();
+  shopPanel.style.display = "none"; bookPanel.style.display = "none";
+  hilo = null;
+  renderCasinoMenu();
+}
+function renderCasinoMenu(){
+  casinoP().innerHTML = `
+    <button class="close" data-close="1">✕</button>
+    <h2>🎲 わんわんカジノ</h2>
+    <div>持っているベル：<span class="bells">🔔 ${bells}</span></div>
+    <h3>あそびをえらぶ</h3>
+    <div class="row"><span class="nm">🎰 スロット777<br><small class="muted">タップでリールを止める！ 777で5000ベル</small></span>
+      <button data-game="slot" ${bells>=100?"":"disabled"}>100ベル</button></div>
+    <div class="row"><span class="nm">🃏 ハイ&ロー<br><small class="muted">つぎのカードは上か下か？ あてるたび×1.3</small></span>
+      <button data-game="hilo" ${bells>=100?"":"disabled"}>100ベル</button></div>
+    <div class="row"><span class="nm">🐕 わんわんダービー<br><small class="muted">勝つ犬をあてろ！ オッズ最大10倍</small></span>
+      <button data-game="derbymenu" ${bells>=200?"":"disabled"}>200ベル</button></div>`;
+  casinoP().style.display = "block";
+}
+/* --- スロット777 --- */
+const SLOT_STRIP = ["7","🔔","⭐","🍎","🍎","🐾","🐾","🦴","🦴","⭐"];
+const SLOT_PAY3 = {"7":5000, "🔔":800, "⭐":300, "🍎":250, "🐾":150, "🦴":150};
+const SLOT_SYMIMG = {"7":"sym-7","🔔":"sym-bell","⭐":"sym-star","🍎":"sym-apple","🐾":"sym-paw","🦴":"sym-bone"};
+let SLOT_PAIR = 150, SLOT_TWO7 = 300;   /* 理論還元率≒82% */
+function startSlot(){
+  bells -= 100; markSave();
+  closePanels();
+  slot = { reels: [0,1,2].map(i=>({pos: Math.random()*10, v: 20+i*3, stop:false})),
+           idx:0, state:"spin", won:0, msg:"", flash:0, syms:null };
+  popup = { text:"🎰 −100ベル！ タップで左からリールを止めよう！", t:2.8 };
+  uiOpen();
+}
+function slotSym(r){ return SLOT_STRIP[((Math.round(r.pos)%10)+10)%10]; }
+function slotTap(){
+  if(!slot) return;
+  if(slot.state === "spin"){
+    const r = slot.reels[slot.idx];
+    r.stop = true; r.pos = Math.round(r.pos);
+    pom();
+    slot.idx++;
+    if(slot.idx >= 3){
+      const syms = slot.reels.map(slotSym);
+      slot.syms = syms;
+      const sevens = syms.filter(s=>s==="7").length;
+      let won = 0, msg = "ざんねん…";
+      if(syms[0]===syms[1] && syms[1]===syms[2]){
+        won = SLOT_PAY3[syms[0]];
+        msg = syms[0]==="7" ? "🌟🌟 777 ジャックポット！！ 🌟🌟" : `${syms[0]}${syms[0]}${syms[0]} そろった！`;
+      }else if(sevens === 2){ won = SLOT_TWO7; msg = "7がふたつ！ おしい！"; }
+      else if(syms[0]===syms[1] || syms[1]===syms[2] || syms[0]===syms[2]){ won = SLOT_PAIR; msg = "ペア！"; }
+      if(won > 0){ bells += won; coinSfx(); }
+      if(won >= 800){ fanfare(); slot.flash = 1.6; }
+      slot.won = won; slot.msg = msg;
+      slot.state = "result";
+      markSave();
+    }
+  }else{
+    slot = null;
+    openCasino();
+  }
+}
+function updateSlot(dt){
+  if(slot.flash > 0) slot.flash -= dt;
+  for(const r of slot.reels) if(!r.stop) r.pos += r.v*dt;
+}
+function drawSlot(){
+  ctx.fillStyle = "#2a2440"; ctx.fillRect(0,0,VW,VH);
+  const MW2 = Math.min(VW*0.9, 300), MH2 = MW2*1.1;
+  const mx = (VW-MW2)/2, my = VH*0.16;
+  if(CASINO_IMG["slot-frame"]){
+    ctx.drawImage(CASINO_IMG["slot-frame"], mx-10, my-24, MW2+20, MH2+40);
+  }else{
+    roundRectC(ctx, mx-10, my-24, MW2+20, MH2+40, 14, "#c0392b");
+    roundRectC(ctx, mx-4, my-18, MW2+8, 30, 8, "#ffd166");
+    ctx.fillStyle="#4a3228"; ctx.font="bold 13px sans-serif"; ctx.textAlign="center";
+    ctx.fillText("スロット777", mx+MW2/2, my+2); ctx.textAlign="left";
+  }
+  /* リールまど */
+  const ww = MW2*0.27, wh = MW2*0.34, gap = MW2*0.055;
+  const wx0 = mx + (MW2 - ww*3 - gap*2)/2, wy = my + MH2*0.24;
+  for(let i=0;i<3;i++){
+    const r = slot.reels[i];
+    const wx = wx0 + i*(ww+gap);
+    roundRectC(ctx, wx, wy, ww, wh, 6, "#fff8ef");
+    ctx.save();
+    ctx.beginPath(); ctx.rect(wx, wy, ww, wh); ctx.clip();
+    ctx.font = `${Math.round(ww*0.62)}px sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const frac = r.pos - Math.floor(r.pos);
+    for(let k=-1;k<=1;k++){
+      const idx = ((Math.floor(r.pos)+k)%10+10)%10;
+      const s = SLOT_STRIP[idx];
+      const sy = wy + wh/2 + (k - frac + (r.stop?Math.floor(r.pos)-r.pos+0:0))*wh;
+      const key = SLOT_SYMIMG[s];
+      if(CASINO_IMG[key]){
+        const iw = ww*0.66;
+        ctx.drawImage(CASINO_IMG[key], wx+ww/2-iw/2, sy-iw/2, iw, iw);
+      }else{
+        ctx.fillStyle = "#4a3228";
+        ctx.fillText(s, wx+ww/2, sy);
+      }
+    }
+    ctx.restore();
+    ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    if(!r.stop && slot.idx===i){
+      ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 3;
+      ctx.strokeRect(wx-2, wy-2, ww+4, wh+4);
+    }
+  }
+  /* ペイライン */
+  ctx.strokeStyle = "rgba(255,95,143,0.8)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(mx+6, wy+wh/2); ctx.lineTo(mx+MW2-6, wy+wh/2); ctx.stroke();
+  /* はいとうひょう */
+  ctx.fillStyle = "#e8dff5"; ctx.font = "9px sans-serif"; ctx.textAlign="center";
+  ctx.fillText("777→5000　🔔🔔🔔→800　⭐⭐⭐→300", VW/2, my+MH2*0.78);
+  ctx.fillText("🍎🍎🍎→250　🐾/🦴→150　7×2→300　ペア→150", VW/2, my+MH2*0.78+13);
+  ctx.textAlign="left";
+  if(slot.flash > 0){
+    ctx.fillStyle = `rgba(255,220,90,${Math.min(0.45, slot.flash*0.35)})`;
+    ctx.fillRect(0,0,VW,VH);
+  }
+}
+function drawSlotHud(wpx, hpx){
+  const sc = (wpx/VW)*1.5;
+  uictx.textAlign="center"; uictx.textBaseline="middle";
+  uictx.font = `bold ${5.6*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+  uictx.fillStyle = "#ffd9e6";
+  uictx.fillText("🎰 スロット777", wpx/2, hpx*0.05);
+  uictx.font = `bold ${4.4*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+  uictx.fillStyle = "#fff";
+  uictx.fillText(`もち🔔${bells}`, wpx/2, hpx*0.09);
+  uictx.font = `${4*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+  uictx.fillStyle = "#d8cfec";
+  if(slot.state==="spin") uictx.fillText("タップでストップ！", wpx/2, hpx*0.94);
+  if(slot.state==="result"){
+    roundRect(uictx, wpx*0.1, hpx*0.62, wpx*0.8, hpx*0.16, 8*sc, "rgba(42,36,64,0.94)");
+    uictx.font = `bold ${5.4*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.fillStyle = "#fff";
+    uictx.fillText(slot.msg, wpx/2, hpx*0.675);
+    uictx.font = `bold ${4.6*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.fillStyle = "#ffd166";
+    uictx.fillText(slot.won>0 ? `＋🔔${slot.won}！` : "つぎこそ！", wpx/2, hpx*0.725);
+    uictx.font = `${3.6*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.fillStyle = "#d8cfec";
+    uictx.fillText("タップでもどる", wpx/2, hpx*0.765);
+  }
+  uictx.textAlign="left";
+}
+/* --- ハイ&ロー --- */
+const CARD_NAME = v=>["A","2","3","4","5","6","7","8","9","10","J","Q","K"][v-1];
+function hiloDeal(){ return { v: 1+Math.floor(Math.random()*13), s: ["♠","♥","♦","♣"][Math.floor(Math.random()*4)] }; }
+function startHilo(){
+  bells -= 100; markSave();
+  hilo = { pot: 100, card: hiloDeal(), streak: 0, msg: "100ベルはらってスタート！" };
+  renderHilo();
+}
+function renderHilo(){
+  const h = hilo;
+  const red = c=>c.s==="♥"||c.s==="♦";
+  casinoP().innerHTML = `
+    <button class="close" data-close="1">✕</button>
+    <h2>🃏 ハイ&ロー</h2>
+    <div>${h.msg}</div>
+    <div style="text-align:center; margin:10px 0;">
+      <span style="display:inline-block; background:#fff; border:2px solid #4a3228; border-radius:10px;
+        padding:12px 22px; font-size:34px; font-weight:bold; color:${red(h.card)?"#e0303a":"#4a3228"};">${h.card.s}${CARD_NAME(h.card.v)}</span>
+    </div>
+    <div style="text-align:center;">ポット <span class="bells">🔔${h.pot}</span>　${h.streak}連勝中（6連勝で自動ゴール）</div>
+    <h3>つぎのカードは いまより…</h3>
+    <div class="row"><button data-hilo="high" style="flex:1;">▲ ハイ（上）</button>
+      <button data-hilo="low" style="flex:1;">▼ ロー（下）</button></div>
+    ${h.streak>0 ? `<div class="row"><button data-hilo="cash" style="flex:1; background:#c9a227;">💰 🔔${h.pot}もらって やめる</button></div>` : ""}
+    <div><small class="muted">同じ数字はまけ。A=1、K=13。あてるとポット×1.3</small></div>`;
+  casinoP().style.display = "block";
+}
+function hiloGuess(dir){
+  const h = hilo;
+  const next = hiloDeal();
+  const win = dir==="high" ? next.v > h.card.v : next.v < h.card.v;
+  if(win){
+    h.pot = Math.floor(h.pot*1.3);
+    h.streak++;
+    h.msg = `${next.s}${CARD_NAME(next.v)}が出た！ せいかい！`;
+    popSound();
+    h.card = next;
+    if(h.streak >= 6){
+      bells += h.pot; markSave(); fanfare();
+      popup = { text:`🏆 6連勝ゴール！！ 🔔${h.pot}かくとく！`, t:4 };
+      hilo = null; renderCasinoMenu();
+      return;
+    }
+    renderHilo();
+  }else{
+    noiseSfx(0.15, 0.05, 600, 200);
+    popup = { text:`💥 ${next.s}${CARD_NAME(next.v)}が出た… ざんねん、ポットぼっしゅう！`, t:3.2 };
+    hilo = null;
+    renderCasinoMenu();
+  }
+}
+/* --- わんわんダービー --- */
+const DERBY_DOGS = [
+  {name:"シロ",  spr:"rival_shiro", odds:2,  p:0.44},
+  {name:"チョビ", spr:"rival_chobi", odds:3,  p:0.29},
+  {name:"ゴン",  spr:"rival_gon",   odds:5,  p:0.18},
+  {name:"ゴルド", spr:"dogb_golden", odds:10, p:0.09}
+];
+function renderDerbyMenu(){
+  casinoP().innerHTML = `
+    <button class="close" data-close="1">✕</button>
+    <h2>🐕 わんわんダービー</h2>
+    <div>持っているベル：<span class="bells">🔔 ${bells}</span>　かけ金200ベル</div>
+    <h3>勝つとおもう犬に かける</h3>
+    ${DERBY_DOGS.map((d,i)=>`
+      <div class="row"><span class="nm">${d.name}<br><small class="muted">オッズ ${d.odds}倍（あたれば🔔${200*d.odds}）</small></span>
+      <button data-derby="${i}" ${bells>=200?"":"disabled"}>かける</button></div>`).join("")}`;
+  casinoP().style.display = "block";
+}
+function startDerby(bet){
+  bells -= 200; markSave();
+  closePanels();
+  /* かくりつで勝者をきめる */
+  let r = Math.random(), winner = 0;
+  for(let i=0;i<DERBY_DOGS.length;i++){ r -= DERBY_DOGS[i].p; if(r<=0){ winner=i; break; } if(i===3) winner=3; }
+  const L = VW - 70;
+  derby = { bet, winner, t:0, L,
+    ft: DERBY_DOGS.map((d,i)=> i===winner ? 5.2 : 5.55 + Math.random()*1.4),
+    xs: [0,0,0,0], state:"run", won:0 };
+  popup = { text:`🐕 −200ベル！ ${DERBY_DOGS[bet].name}にかけた！ よーい、ドン！`, t:2.6 };
+  uiOpen();
+}
+function updateDerby(dt){
+  const D = derby;
+  if(D.state !== "run"){ return; }
+  D.t += dt;
+  for(let i=0;i<4;i++){
+    const pace = D.L/D.ft[i];
+    D.xs[i] = Math.min(D.L, D.xs[i] + pace*dt*(0.82 + 0.36*Math.abs(Math.sin(D.t*2.1 + i*1.7))));
+    /* 勝者はゴール直前でひとのび */
+    if(i===D.winner && D.t > D.ft[i]*0.8) D.xs[i] = Math.min(D.L, D.xs[i] + pace*dt*0.35);
+  }
+  if(D.xs[D.winner] >= D.L){
+    D.state = "result";
+    if(D.bet === D.winner){
+      D.won = 200*DERBY_DOGS[D.winner].odds;
+      bells += D.won; markSave();
+      fanfare();
+    }else{
+      noiseSfx(0.15, 0.05, 600, 200);
+    }
+  }
+}
+function drawDerby(){
+  const D = derby;
+  ctx.fillStyle = "#7ec06a"; ctx.fillRect(0,0,VW,VH);
+  /* コース */
+  const laneH = VH*0.115, top = VH*0.24;
+  ctx.fillStyle = "#b07a4a"; ctx.fillRect(0, top-8, VW, laneH*4+16);
+  for(let i=0;i<4;i++){
+    ctx.fillStyle = i%2 ? "#c98d5c" : "#bd8250";
+    ctx.fillRect(0, top+i*laneH, VW, laneH);
+  }
+  /* ゴール */
+  const gx = VW-46;
+  for(let i=0;i<10;i++){
+    ctx.fillStyle = i%2 ? "#fff" : "#e0303a";
+    ctx.fillRect(gx, top-8+i*(laneH*4+16)/10, 6, (laneH*4+16)/10);
+  }
+  if(CASINO_IMG["goal-tape"]) ctx.drawImage(CASINO_IMG["goal-tape"], gx-14, top-26, 40, 20);
+  /* いぬたち */
+  for(let i=0;i<4;i++){
+    const sh = SPR[DERBY_DOGS[i].spr] || RIVALS[DERBY_DOGS[i].spr];
+    const x = 16 + D.xs[i], y = top + i*laneH + laneH*0.78;
+    ctx.fillStyle = "rgba(60,90,50,0.25)";
+    ctx.beginPath(); ctx.ellipse(x, y+3, 10, 3.4, 0, 0, 7); ctx.fill();
+    if(sh){
+      const set = sh.sideR;
+      const fr = D.state==="run" ? set[1+Math.floor((D.t*9+i)%2)] : set[0];
+      ctx.drawImage(fr.c, Math.round(x-fr.w/2), Math.round(y-fr.h+4));
+    }else{
+      ctx.fillStyle = "#8a5a3a"; ctx.fillRect(x-8, y-12, 16, 12);
+    }
+    ctx.font = "bold 9px sans-serif"; ctx.textAlign="left";
+    ctx.fillStyle = i===D.bet ? "#ff5f8f" : "#4a3228";
+    ctx.fillText(`${DERBY_DOGS[i].name}${i===D.bet?" ◀あなた":""}`, 6, top+i*laneH+11);
+  }
+}
+function drawDerbyHud(wpx, hpx){
+  const D = derby;
+  const sc = (wpx/VW)*1.5;
+  uictx.textAlign="center"; uictx.textBaseline="middle";
+  uictx.font = `bold ${5.6*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+  uictx.fillStyle = "#fff";
+  uictx.strokeStyle = "rgba(74,50,40,0.6)"; uictx.lineWidth = 3;
+  uictx.strokeText("🐕 わんわんダービー", wpx/2, hpx*0.06);
+  uictx.fillText("🐕 わんわんダービー", wpx/2, hpx*0.06);
+  if(D.state==="result"){
+    const hit = D.bet === D.winner;
+    roundRect(uictx, wpx*0.1, hpx*0.66, wpx*0.8, hpx*0.19, 8*sc, "rgba(58,42,62,0.94)");
+    uictx.font = `bold ${5.6*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.fillStyle = "#fff";
+    uictx.fillText(`🏁 1着は ${DERBY_DOGS[D.winner].name}！`, wpx/2, hpx*0.71);
+    uictx.font = `bold ${4.8*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.fillStyle = hit ? "#ffd166" : "#e8c9d8";
+    uictx.fillText(hit ? `🎉 てきちゅう！ ＋🔔${D.won}！` : "はずれ… つぎこそ！", wpx/2, hpx*0.765);
+    uictx.font = `${3.6*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.fillStyle = "#d8cfec";
+    uictx.fillText("タップでもどる", wpx/2, hpx*0.81);
+  }
+  uictx.textAlign="left";
+}
+function derbyTap(){
+  if(derby && derby.state==="result"){ derby = null; openCasino(); }
+}
+/* カジノパネルのクリック */
+casinoP().addEventListener("click", e=>{
+  const t = e.target;
+  if(t.dataset.close){ closePanels(); hilo = null; return; }
+  if(t.dataset.game==="slot" && bells>=100){ startSlot(); return; }
+  if(t.dataset.game==="hilo" && bells>=100){ startHilo(); return; }
+  if(t.dataset.game==="derbymenu"){ renderDerbyMenu(); return; }
+  if(t.dataset.hilo){
+    if(t.dataset.hilo==="cash"){
+      bells += hilo.pot; markSave(); coinSfx();
+      popup = { text:`💰 🔔${hilo.pot}をかくとく！ いい引きぎわ！`, t:3 };
+      hilo = null; renderCasinoMenu(); return;
+    }
+    hiloGuess(t.dataset.hilo); return;
+  }
+  if(t.dataset.derby != null && bells>=200){ startDerby(+t.dataset.derby); return; }
+});
+/* カジノのたてもの */
+function drawCasino(){
+  const x = CASINO.tx*T, y = CASINO.ty*T;
+  const im = TOWN.casino;
+  if(im){ ctx.drawImage(im, Math.round(x + 48 - im.width/2), Math.round(y + 96 - im.height)); return; }
+  ctx.fillStyle="#4a3228"; ctx.fillRect(x, y+24, 96, 72);
+  ctx.fillStyle="#3a3560"; ctx.fillRect(x+3, y+27, 90, 66);
+  ctx.fillStyle="#c9a227"; ctx.fillRect(x-3, y+12, 102, 16);
+  ctx.fillStyle="#2a2440"; ctx.fillRect(x+18, y-6, 60, 20);
+  ctx.fillStyle = Math.floor(time*3)%2 ? "#ffd166" : "#ff8fae";
+  ctx.font="bold 11px sans-serif"; ctx.textAlign="center";
+  ctx.fillText("777", x+48, y+8); ctx.textAlign="left";
+  ctx.fillStyle="#e0303a"; ctx.fillRect(x+38, y+66, 20, 27);   /* 赤じゅうたん */
+  ctx.fillStyle="#fff"; ctx.fillRect(x+14, y+42, 12, 12); ctx.fillRect(x+70, y+42, 12, 12);
+  ctx.fillStyle="#2a2440"; ctx.font="bold 9px sans-serif"; ctx.textAlign="center";
+  ctx.fillText("♠", x+20, y+51); ctx.fillText("♥", x+76, y+51); ctx.textAlign="left";
+}
+
 /* ================= おせわ（たまごっち） ================= */
 const feedBtn = document.getElementById("feedBtn");
 function updateFeedBtn(){ feedBtn.style.display = foodStock>0 ? "flex" : "none"; }
@@ -2455,7 +2866,7 @@ function setSick(){
   markSave();
 }
 function feedDog(){
-  if(foodStock<=0 || dialog || race || farewell || pachi) return;
+  if(foodStock<=0 || dialog || race || farewell || pachi || slot || derby) return;
   if(care.hunger>=98){ floatTexts.push({x:dog.x, y:dog.y-24, text:"おなかいっぱいみたい", t:1.4}); return; }
   foodStock--;
   care.hunger = Math.min(100, care.hunger + 40);
@@ -2466,6 +2877,7 @@ function feedDog(){
   for(let i=0;i<2;i++) hearts.push({x:dog.x+(Math.random()*20-10), y:dog.y-16-i*4, vy:-(21+Math.random()*10), life:1.2});
   [0,180,360].forEach(t=>setTimeout(()=>noiseSfx(0.06, 0.05, 1500, 500), t));
   poopTimer = 50 + Math.random()*70;
+  floatTexts.push({x:dog.x, y:dog.y-30, text:`🍖 ごはんをあげた（のこり${foodStock}食）`, t:1.8});
   updateFeedBtn(); markSave();
   tutDone(1);
 }
@@ -2531,6 +2943,8 @@ function update(dt){
     return;
   }
   if(pachi){ updatePachi(dt); return; }
+  if(slot){ updateSlot(dt); return; }
+  if(derby){ updateDerby(dt); return; }
   if(race){ updateRace(dt); return; }
   if(mapOpen) actPressed = false;   /* ちずを見ているあいだは アクションしない */
 
@@ -3462,6 +3876,8 @@ function drawBug(b, nightF){
 
 function drawWorld(){
   if(pachi){ drawPachi(); return; }
+  if(slot){ drawSlot(); return; }
+  if(derby){ drawDerby(); return; }
   if(race){ drawRace(); return; }
   const phase = dayPhase();
   cam.x = Math.round(clamp(player.x - VW/2, 0, MW*T-VW));
@@ -3525,6 +3941,7 @@ function drawWorld(){
   items.push({y:(GACHA.ty+1)*T, f:drawGachaStand});
   items.push({y:(ONSEN.ty+4)*T, f:drawOnsen});
   items.push({y:(CAFE.ty+4)*T, f:drawCafe});
+  items.push({y:(CASINO.ty+4)*T, f:drawCasino});
   /* きらきらの まち：おいわいの かざりつけ */
   if(spiritTier()===3){
     const D = (n, cx, by, bob)=>{
@@ -3677,6 +4094,7 @@ function drawWorld(){
     hole((PACHINKO.tx+2)*T, (PACHINKO.ty+2)*T, 72, 0.8);                             /* ぽちんこのネオン */
     hole((ONSEN.tx+2)*T, (ONSEN.ty+2)*T, 60, 0.6);
     hole((CAFE.tx+2)*T, (CAFE.ty+2)*T, 60, 0.6);
+    hole((CASINO.tx+2)*T, (CASINO.ty+2)*T, 78, 0.85);                                /* カジノの777ネオン */
     for(const pf of placedFurn){
       if(pf.n==="takibi") hole(pf.tx*T+12, pf.ty*T+12, 78, 0.95);                    /* たき火 */
       if(pf.n==="tourou") hole(pf.tx*T+12, pf.ty*T+6, 46, 0.8);                      /* 石とうろう */
@@ -3722,6 +4140,8 @@ function drawUI(){
   uictx.clearRect(0,0,wpx,hpx);
   if(farewell){ drawFarewell(wpx, hpx); return; }
   if(pachi){ drawPachiHud(wpx, hpx); return; }
+  if(slot){ drawSlotHud(wpx, hpx); return; }
+  if(derby){ drawDerbyHud(wpx, hpx); return; }
   if(race){ drawRaceUI(); return; }
   if(mapOpen){ drawMinimap(wpx, hpx); return; }
   const psc = wpx / VW;           /* 位置変換用 */
@@ -3793,6 +4213,13 @@ function drawUI(){
     if(d < 56 && !dialog){
       const [sx,sy] = W2S((CAFE.tx+2)*T, CAFE.ty*T-8);
       bubble(sx, sy, "☕ わんカフェ", sc, true);
+    }
+  }
+  {
+    const d = dist(player.x,player.y, (CASINO.tx+2)*T, (CASINO.ty+3.6)*T);
+    if(d < 56 && !dialog){
+      const [sx,sy] = W2S((CASINO.tx+2)*T, CASINO.ty*T-8);
+      bubble(sx, sy, "🎲 わんわんカジノ", sc, true);
     }
   }
   const dsh = dogSheet();
@@ -3983,6 +4410,7 @@ function drawMinimap(wpx, hpx){
   uictx.fillText("🏁", mx+(RACEGATE.tx+1.5)*3*scl, my+(RACEGATE.ty)*3*scl);
   uictx.fillText("🎰", mx+(PACHINKO.tx+2)*3*scl, my+(PACHINKO.ty+1.5)*3*scl);
   uictx.fillText("♨", mx+(ONSEN.tx+2)*3*scl, my+(ONSEN.ty+1.5)*3*scl);
+  uictx.fillText("🎲", mx+(CASINO.tx+2)*3*scl, my+(CASINO.ty+2)*3*scl);
   uictx.fillText("🎣", mx+40*3*scl, my+114*3*scl);
   uictx.fillText("🌸", mx+11*3*scl, my+145*3*scl);
   /* いまここ（点滅） */
@@ -4141,7 +4569,8 @@ window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundIte
   setBreed:(b)=>{ dogBreed = b; }, getBreed:()=>dogBreed, DOG_BREEDS, openNamePanel,
   setWeather:(w)=>{ weather = w; }, getWeather:()=>weather, placedFurn, furnInv, fashionOwned,
   getTut:()=>tutStep, tutDone,
-  openPachinko, pachiTap, pachiRetry, playGacha, getPachi:()=>pachi, useOnsen, openCafe,
+  openPachinko, startPachi, pachiTap, pachiRetry, playGacha, getPachi:()=>pachi, useOnsen, openCafe,
+  openCasino, startSlot, slotTap, getSlot:()=>slot, startHilo, hiloGuess, startDerby, derbyTap, getDerby:()=>derby,
   get careScore(){ return careScore; },
   get rankInfo(){ return rankInfo; },
   toggleMap:()=>{ mapOpen = !mapOpen; },
