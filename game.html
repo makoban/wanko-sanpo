@@ -296,11 +296,12 @@
 "use strict";
 /* ================= 基本セットアップ ================= */
 /* ================= バージョン（更新のたびに上げる＋内容を書く） ================= */
-const GAME_VER = "1.9.0";
+const GAME_VER = "1.9.1";
 const UPDATE_NOTES = [
   "🎲 わんわんカジノOPEN！（スロット777・ハイ&ロー・ダービー）",
   "🎰 ぽちんこがコース制に（かけ金3種・最大配当10倍）",
-  "🛍 お買いもの・お薬・ごはんの案内メッセージを追加"
+  "🛍 お買いもの・お薬・ごはんの案内メッセージを追加",
+  "📌 「遊ぶ前のお約束」は一度だけの表示になりました"
 ];
 const T = 24, MW = 80, MH = 192;     /* 5倍のひろさの街（森・広場・果樹園・大きな湖・海） */
 let VW = 320, VH = 240;
@@ -4519,7 +4520,14 @@ document.addEventListener("visibilitychange", ()=>{
 /* --- あそぶまえの おやくそく（初回のみ表示） --- */
 (function(){
   const pp = document.getElementById("promisePanel");
-  if(promised){ pp.style.display = "none"; return; }   /* 約束ずみなら出さない */
+  /* セーブとは別の独立キーでも記録：ゲームリセットしても二度目は出ない */
+  let promisedEver = false;
+  try{ promisedEver = localStorage.getItem("wanko-promised") === "1"; }catch(e){}
+  if(promised || promisedEver){
+    pp.style.display = "none";
+    if(!promised){ promised = true; markSave(); }
+    return;
+  }
   if(dogName){
     document.getElementById("promiseWait").textContent =
       dogName + "は、今日もあなたを待っていました。";
@@ -4527,6 +4535,7 @@ document.addEventListener("visibilitychange", ()=>{
   document.getElementById("promiseOk").addEventListener("click", ()=>{
     pp.style.display = "none";
     promised = true; markSave(); doSave();
+    try{ localStorage.setItem("wanko-promised", "1"); }catch(e){}
     try{ jingle(); }catch(e){}
   });
   document.getElementById("promiseNo").addEventListener("click", ()=>{
