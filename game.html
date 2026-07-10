@@ -296,12 +296,11 @@
 "use strict";
 /* ================= 基本セットアップ ================= */
 /* ================= バージョン（更新のたびに上げる＋内容を書く） ================= */
-const GAME_VER = "1.9.1";
+const GAME_VER = "1.9.2";
 const UPDATE_NOTES = [
-  "🎲 わんわんカジノOPEN！（スロット777・ハイ&ロー・ダービー）",
-  "🎰 ぽちんこがコース制に（かけ金3種・最大配当10倍）",
-  "🛍 お買いもの・お薬・ごはんの案内メッセージを追加",
-  "📌 「遊ぶ前のお約束」は一度だけの表示になりました"
+  "🎲 わんわんカジノが本番デザインに！（777ネオンの新店舗）",
+  "🎰 スロットがねこ耳の新筐体＆本物の図柄に、BIG WIN演出も",
+  "🃏 ディーラーのクロエがお出むかえ、ダービーにゲートとゴールテープ"
 ];
 const T = 24, MW = 80, MH = 192;     /* 5倍のひろさの街（森・広場・果樹園・大きな湖・海） */
 let VW = 320, VH = 240;
@@ -2486,7 +2485,10 @@ function renderCasinoMenu(){
   casinoP().innerHTML = `
     <button class="close" data-close="1">✕</button>
     <h2>🎲 わんわんカジノ</h2>
-    <div>持っているベル：<span class="bells">🔔 ${bells}</span></div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <img src="sprites/items/casino/kuroe-dealer.png" style="width:50px; image-rendering:pixelated;" onerror="this.remove()">
+      <div>「いらっしゃい。今夜はツイてる？」<br>持っているベル：<span class="bells">🔔 ${bells}</span></div>
+    </div>
     <h3>あそびをえらぶ</h3>
     <div class="row"><span class="nm">🎰 スロット777<br><small class="muted">タップでリールを止める！ 777で5000ベル</small></span>
       <button data-game="slot" ${bells>=100?"":"disabled"}>100ベル</button></div>
@@ -2597,6 +2599,11 @@ function drawSlot(){
   if(slot.flash > 0){
     ctx.fillStyle = `rgba(255,220,90,${Math.min(0.45, slot.flash*0.35)})`;
     ctx.fillRect(0,0,VW,VH);
+    if(CASINO_IMG.bigwin){
+      const bw = Math.min(VW*0.6, 200), bh = bw*CASINO_IMG.bigwin.height/CASINO_IMG.bigwin.width;
+      const bob = Math.sin(time*6)*4;
+      ctx.drawImage(CASINO_IMG.bigwin, VW/2-bw/2, VH*0.30-bh/2+bob, bw, bh);
+    }
   }
 }
 function drawSlotHud(wpx, hpx){
@@ -2744,7 +2751,12 @@ function drawDerby(){
     ctx.fillStyle = i%2 ? "#fff" : "#e0303a";
     ctx.fillRect(gx, top-8+i*(laneH*4+16)/10, 6, (laneH*4+16)/10);
   }
-  if(CASINO_IMG["goal-tape"]) ctx.drawImage(CASINO_IMG["goal-tape"], gx-14, top-26, 40, 20);
+  if(CASINO_IMG["goal-tape"]) ctx.drawImage(CASINO_IMG["goal-tape"], gx-14, top-30, 44, 23);
+  if(CASINO_IMG["derby-gate"] && D.t < 1.2){
+    ctx.globalAlpha = Math.min(1, (1.2-D.t)*2);
+    ctx.drawImage(CASINO_IMG["derby-gate"], 2, top-14, 60, 58);
+    ctx.globalAlpha = 1;
+  }
   /* いぬたち */
   for(let i=0;i<4;i++){
     const sh = SPR[DERBY_DOGS[i].spr] || RIVALS[DERBY_DOGS[i].spr];
