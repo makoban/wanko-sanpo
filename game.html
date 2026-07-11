@@ -297,11 +297,11 @@
 "use strict";
 /* ================= 基本セットアップ ================= */
 /* ================= バージョン（更新のたびに上げる＋内容を書く） ================= */
-const GAME_VER = "1.10.1";
+const GAME_VER = "1.11.0";
 const UPDATE_NOTES = [
-  "🏮 川の向こうに「うらまち」誕生！ 橋をわたって東へ",
-  "🦊 勧誘に“本物のお得”がまざるように。話し方をよく見て見抜こう",
-  "💰 「袋を運ぶだけ」の甘いおしごとは受け子のワナ…！ 銀次は見ている"
+  "🌦 町の天気が「あなたの今いる場所のほんとうの天気」とシンクロ！",
+  "🦊 勧誘に“本物のお得”がまざるように。話し方で見抜こう",
+  "💰 「袋を運ぶだけ」の甘いおしごとは受け子のワナ…！"
 ];
 const T = 24, MW = 136, MH = 192;    /* 大きな街＋東の川向こうに「うらまち」地区 */
 let VW = 320, VH = 240;
@@ -855,13 +855,28 @@ const MONTH_DECOR = {
   11:[["momiji",31.0,49.6],["icho",49.0,49.6]],
   12:[["tree",39.7,50.2],["yukidaruma",31.0,49.9],["present",49.0,49.6]]
 };
-/* 天気：日づけで決まる（毎日かわる） */
+/* 天気：まずは日づけシードで決めて、現在地のほんとうの天気がとれたら上書き */
 function hashStr(s){ let h=7; for(const c of s) h=(h*31 + c.charCodeAt(0))>>>0; return h; }
 let weather = (()=>{
   const r = hashStr(new Date().toISOString().slice(0,10)) % 100;
   let w = r < 45 ? "sun" : r < 70 ? "kumo" : r < 90 ? "ame" : "kiri";
   if(w==="ame" && (MONTH_NOW===12 || MONTH_NOW<=2)) w = "yuki";
   return w;
+})();
+/* 現在地シンク：IPからおおまかな場所→Open-Meteoの今の天気（許可ポップアップなし・失敗時はシードのまま） */
+(async ()=>{
+  try{
+    const g = await (await fetch("https://get.geojs.io/v1/ip/geo.json")).json();
+    const w = await (await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${g.latitude}&longitude=${g.longitude}&current=weather_code`
+    )).json();
+    const c = w.current.weather_code;
+    weather = c === 0 || c === 1 ? "sun"
+            : c <= 3 ? "kumo"
+            : c === 45 || c === 48 ? "kiri"
+            : (c >= 71 && c <= 77) || c === 85 || c === 86 ? "yuki"
+            : "ame";
+  }catch(e){ /* オフラインなどは日づけシードのまま */ }
 })();
 const WEATHER_EMOJI = {sun:"☀️", kumo:"☁️", ame:"🌧", yuki:"❄️", kiri:"🌫"};
 
