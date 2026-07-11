@@ -297,11 +297,11 @@
 "use strict";
 /* ================= 基本セットアップ ================= */
 /* ================= バージョン（更新のたびに上げる＋内容を書く） ================= */
-const GAME_VER = "1.13.0";
+const GAME_VER = "1.13.1";
 const UPDATE_NOTES = [
-  "🏔 北の森の奥に霊峰わんこ富士が開山！ 山頂で犬神さまのご利益を（1日1回）",
-  "📈 わん株取引所と🏠ポン蔵不動産がうらまちに。マイホームはローンも組めるぽん",
-  "🎭 わん座に日替わり演目！ 観劇するとその日のご利益つき"
+  "📍 みちあんない機能！ 🗺地図で行きたい場所のマークをタップすると、",
+  "　 ピンクの矢印が目的地までずっと案内してくれるよ（とうちゃくで解除）",
+  "🏔 わんこ富士・📈わん株・🏠マイホーム・🎭演目も好評開催中"
 ];
 const T = 24, MW = 136, MH = 192;    /* 大きな街＋東の川向こうに「うらまち」地区 */
 let VW = 320, VH = 240;
@@ -404,7 +404,11 @@ stage.addEventListener("touchstart", e=>{
   if(derby){ derbyTap(); e.preventDefault(); return; }
   if(farewell){ farewellTap(); e.preventDefault(); return; }
   /* ちずが ひらいていたら とじる */
-  if(mapOpen){ mapOpen = false; uiClose(); e.preventDefault(); return; }
+  if(mapOpen){
+    const tch = e.touches[0];
+    if(tch && mapTapNav(tch.clientX, tch.clientY)){ e.preventDefault(); return; }
+    mapOpen = false; uiClose(); e.preventDefault(); return;
+  }
   /* パネルが ひらいているとき、そとをタップしたら とじるだけ */
   if(["shopPanel","bookPanel","racePanel","cafePanel","pachiPanel","casinoPanel"].some(id=>document.getElementById(id).style.display==="block")){
     closePanels();
@@ -3771,6 +3775,12 @@ function update(dt){
   if(tutStep===0 && player.moving){ tutMoveT += dt; if(tutMoveT > 1.1) tutDone(0); }
 
   if(blessT > 0) blessT -= dt;
+  /* ナビ：とうちゃく判定 */
+  if(navTarget && dist(player.x, player.y, navTarget.x*T, navTarget.y*T) < 64){
+    popup = { text:`📍 とうちゃく！ ${navTarget.label}だよ`, t:3.2 };
+    jingle();
+    navTarget = null;
+  }
   if(engiShow){ engiShow.t -= dt; if(engiShow.t <= 0) engiShow = null; }
 
   /* --- 勧誘タイマー：ときどき あやしい人が寄ってくる（うらまちでは3倍） --- */
@@ -4903,6 +4913,37 @@ function drawUI(){
   uictx.textBaseline = "middle";
   uictx.fillText("v" + GAME_VER, 5*csc, hpx - 3.2*csc);
 
+  /* いきさき案内：チップと矢印 */
+  if(navTarget && tutStep >= TUT_STEPS.length && !dialog && !fishing && !farewell){
+    const gfs = Math.max(11, 4.3*csc);
+    uictx.font = `bold ${gfs}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    const gtxt = `📍 ${navTarget.label}へ あんない中`;
+    const gtw = Math.min(uictx.measureText(gtxt).width, wpx*0.88);
+    const gh = 9.4*csc;
+    const gx = wpx/2 - (gtw+9*csc)/2, gy = hpx - gh - 4*csc;
+    roundRect(uictx, gx, gy, gtw+9*csc, gh, gh/2, "rgba(255,255,255,0.88)");
+    uictx.strokeStyle = "#ffb0c8"; uictx.lineWidth = 2; uictx.stroke();
+    uictx.fillStyle = "#c05577"; uictx.textAlign = "center";
+    uictx.fillText(gtxt, wpx/2, gy+gh/2, wpx*0.84);
+    uictx.textAlign = "left";
+    const ddx = navTarget.x*T - player.x, ddy = navTarget.y*T - player.y;
+    if(Math.hypot(ddx,ddy) > 100){
+      const ang = Math.atan2(ddy,ddx);
+      const ax = wpx/2 + Math.cos(ang)*wpx*0.30;
+      const ay = hpx*0.44 + Math.sin(ang)*hpx*0.26;
+      uictx.save();
+      uictx.translate(ax,ay); uictx.rotate(ang);
+      uictx.translate(Math.sin(time*4)*3, 0);
+      const s3 = 3.4*csc/2.5;
+      uictx.fillStyle = "rgba(255,143,174,0.95)";
+      uictx.strokeStyle = "#fff"; uictx.lineWidth = 3;
+      uictx.beginPath();
+      uictx.moveTo(3.4*s3, 0); uictx.lineTo(-2*s3, -2.4*s3); uictx.lineTo(-2*s3, 2.4*s3);
+      uictx.closePath(); uictx.stroke(); uictx.fill();
+      uictx.restore();
+    }
+  }
+
   /* チュートリアルガイド（初回のみ） */
   if(tutStep < TUT_STEPS.length && !dialog && !fishing && !farewell){
     const st = TUT_STEPS[tutStep];
@@ -5010,6 +5051,49 @@ function drawUI(){
     }
   }
 }
+/* ================= いきさき案内（ナビ） ================= */
+let navTarget = null;
+const NAV_SPOTS = [
+  ["🫛 そらまめ商店", 47, 51], ["⛲ ふんすい広場", 40, 54], ["🏁 レース場", 65, 70],
+  ["🎰 ぽちんこホール", 57, 50], ["🎲 わんわんカジノ", 64, 66], ["♨ わんわん温泉", 64, 50],
+  ["☕ わんカフェ", 64, 57], ["📋 おしごと掲示板", 88, 46], ["🏮 うらまち横丁", 95, 50],
+  ["🎭 わん座", 100, 67], ["♨ 旅館の湯", 90, 122], ["🎡 わんダーランド", 114, 143],
+  ["📈 わん株取引所", 122, 61], ["🏠 ポン蔵不動産", 87, 65],
+  ["🌈 にじのはしパーク", 14, 114], ["⛩ わんこ富士さんちょう", 36, 6],
+  ["🎣 さんばし（湖づり）", 40, 114], ["🌊 すなはま（海づり）", 40, 160]
+];
+function minimapGeom(){
+  const wpx = ui.width, hpx = ui.height;
+  const scl = Math.min((wpx*0.84)/MINI.width, (hpx*0.78)/MINI.height);
+  const mw = MINI.width*scl, mh = MINI.height*scl;
+  const mx = (wpx-mw)/2, my = (hpx-mh)/2 + hpx*0.015;
+  return { mx, my, scl };
+}
+function mapTapNav(clientX, clientY){
+  const rect = ui.getBoundingClientRect();
+  const px = (clientX - rect.left) * (ui.width / rect.width);
+  const py = (clientY - rect.top) * (ui.height / rect.height);
+  const { mx, my, scl } = minimapGeom();
+  for(const [label, tx, ty] of NAV_SPOTS){
+    const sx = mx + tx*3*scl, sy = my + ty*3*scl;
+    if(Math.hypot(px-sx, py-sy) < 20){
+      if(navTarget && navTarget.label === label){
+        navTarget = null;
+        popup = { text:"📍 あんないを かいじょしたよ", t:2.4 };
+      }else{
+        navTarget = { label, x: tx, y: ty };
+        popup = { text:`📍 ${label}へ あんない中！ ピンクの矢印についていってね`, t:4 };
+        popSound();
+      }
+      mapOpen = false; uiClose();
+      return true;
+    }
+  }
+  return false;
+}
+stage.addEventListener("mousedown", e=>{
+  if(mapOpen && mapTapNav(e.clientX, e.clientY)) e.preventDefault();
+});
 function drawMinimap(wpx, hpx){
   const sc = (wpx / VW) * 1.5;
   const scl = Math.min((wpx*0.84)/MINI.width, (hpx*0.78)/MINI.height);
@@ -5033,6 +5117,15 @@ function drawMinimap(wpx, hpx){
   uictx.fillText("🏮", mx+95*3*scl, my+50*3*scl);
   uictx.fillText("🌈", mx+14*3*scl, my+114*3*scl);
   uictx.fillText("⛩", mx+40*3*scl, my+5*3*scl);
+  uictx.fillText("☕", mx+64*3*scl, my+56*3*scl);
+  uictx.fillText("📋", mx+88*3*scl, my+45*3*scl);
+  /* あんない中の目的地はリングで強調 */
+  if(navTarget){
+    const nx = mx + navTarget.x*3*scl, ny = my + navTarget.y*3*scl;
+    uictx.strokeStyle = `rgba(255,95,143,${0.6+0.4*Math.abs(Math.sin(time*3))})`;
+    uictx.lineWidth = 3;
+    uictx.beginPath(); uictx.arc(nx, ny, 14+Math.sin(time*3)*3, 0, 7); uictx.stroke();
+  }
   uictx.fillText("🎣", mx+40*3*scl, my+114*3*scl);
   uictx.fillText("🌸", mx+11*3*scl, my+145*3*scl);
   /* いまここ（点滅） */
@@ -5047,7 +5140,7 @@ function drawMinimap(wpx, hpx){
   uictx.fillText("🗺 町の地図", wpx/2, my - 22);
   uictx.font = `${3.6*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
   uictx.fillStyle = "#bfa893";
-  uictx.fillText("タップで閉じる", wpx/2, my + mh + 16);
+  uictx.fillText("マークをタップで あんない開始 ・ ほかは閉じる", wpx/2, my + mh + 16);
   uictx.textAlign = "left";
 }
 function drawFarewell(wpx, hpx){
@@ -5325,6 +5418,7 @@ window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundIte
   getScamLoss:()=>scamLoss, openJobBoard, getJob:()=>job,
   memorials, farewellTap,
   blessInugami, openKabu, openFudosan, openEngi, getHome:()=>({homeLevel, loanLeft}), kabuP, kabuH,
+  setNav:(label,x,y)=>{ navTarget = {label,x,y}; }, getNav:()=>navTarget, NAV_SPOTS, mapTapNav,
   get careScore(){ return careScore; },
   get rankInfo(){ return rankInfo; },
   toggleMap:()=>{ mapOpen = !mapOpen; },
