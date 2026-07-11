@@ -297,11 +297,11 @@
 "use strict";
 /* ================= 基本セットアップ ================= */
 /* ================= バージョン（更新のたびに上げる＋内容を書く） ================= */
-const GAME_VER = "1.12.0";
+const GAME_VER = "1.13.0";
 const UPDATE_NOTES = [
-  "🌈 湖の西に「にじのはしパーク」…おわかれの日のための、静かな丘",
-  "🕯 最悪のパターンには お葬式と虹の橋の おみおくりを。お墓は永遠に残ります",
-  "⚠ 5日ほうっておくと住民が本気で心配します。そうなる前に、会いに来てね"
+  "🏔 北の森の奥に霊峰わんこ富士が開山！ 山頂で犬神さまのご利益を（1日1回）",
+  "📈 わん株取引所と🏠ポン蔵不動産がうらまちに。マイホームはローンも組めるぽん",
+  "🎭 わん座に日替わり演目！ 観劇するとその日のご利益つき"
 ];
 const T = 24, MW = 136, MH = 192;    /* 大きな街＋東の川向こうに「うらまち」地区 */
 let VW = 320, VH = 240;
@@ -653,7 +653,11 @@ const TOWN = {};
  "kanransha","merry","coffee-cup","obakeyashiki","wonder-gate","fuusen-wagon","popcorn","wonder-kanban",
  "quest-board","kabu-board","kawa-hashi","taki","iwa","iwa-big",
  /* v11：おみおくり */
- "ceremony-hall","okuri-tower","memorial-gate","ohaka","ohaka-hana","saidan"].forEach(n=>{
+ "ceremony-hall","okuri-tower","memorial-gate","ohaka","ohaka-hana","saidan",
+ /* v12：わんこ富士・わん株・演目（v10地形も） */
+ "gake-face","gake-top","tsuribashi","cave-in","sancho-torii","yukiyama","watashibune","hashi-tate",
+ "tozan-guchi","yama-goya","onsen-tamago","ropeway","kumo-umi","sancho-hokora","yuki-patch",
+ "kabu-kaikan","fudosan","myhome-s","myhome-m","myhome-l","kabuki-bg"].forEach(n=>{
   const im = new Image();
   im.onload = ()=>{ TOWN[n] = im; };
   im.src = "sprites/town/" + n + ".png";
@@ -997,6 +1001,7 @@ function doSave(){
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       bells, hasBall, bandana, petCount, playerName, dogName, raceWins, dogBreed,
       accessory, fashionOwned, furnInv, placedFurn, memorials,
+      lastBlessDay, toucho, homeLevel, loanLeft, lastLoanDay, kabuP, kabuH, lastKabuDay, kabukiBuff,
       foodStock, medCount, care, poops, savedAt: Date.now(),
       careScore, playerId, lastPlayDay, spirit, tut: tutStep, promised, lastSeenVer, scamLoss,
       apple:pocket.apple, fossil:pocket.fossil,
@@ -1020,6 +1025,11 @@ function loadSave(){
     Object.assign(furnInv, d.furnInv||{});
     if(Array.isArray(d.placedFurn)) placedFurn.push(...d.placedFurn.slice(0,60));
     if(Array.isArray(d.memorials)) memorials.push(...d.memorials.slice(0,24));
+    lastBlessDay = d.lastBlessDay || ""; toucho = d.toucho || 0;
+    homeLevel = d.homeLevel || 0; loanLeft = d.loanLeft || 0; lastLoanDay = d.lastLoanDay || "";
+    Object.assign(kabuP, d.kabuP || {}); Object.assign(kabuH, d.kabuH || {});
+    lastKabuDay = d.lastKabuDay || ""; kabukiBuff = d.kabukiBuff || null;
+    if(homeLevel > 0) setHomeSolid();
     careScore = d.careScore||0; playerId = d.playerId||""; lastPlayDay = d.lastPlayDay||"";
     if(d.spirit != null) spirit = clamp(d.spirit, 0, 100);
     tutStep = d.tut != null ? d.tut : (d.playerName ? 99 : 0);   /* 既存プレイヤーはスキップ */
@@ -1194,6 +1204,30 @@ const ONSEN = { tx:62, ty:48 };
 for(let y=49;y<52;y++) for(let x=62;x<66;x++) solid[y][x]=true;
 const CAFE = { tx:62, ty:55 };
 for(let y=56;y<59;y++) for(let x=62;x<66;x++) solid[y][x]=true;
+/* 霊峰わんこ富士（v12・北の森の奥）：4段の崖をジグザグにのぼる */
+for(const [ry,gapx] of [[19,39],[14,50],[9,28],[4,44]]){
+  for(let x=24;x<57;x++){
+    if(x===gapx || x===gapx+1) continue;
+    ground[ry][x] = "c"; solid[ry][x] = true;
+  }
+}
+const FUJI_DECO = [   /* [画像, 中心x, 足元y, solid?] */
+  ["yukiyama",     40, 1.6],
+  ["sancho-torii", 40, 4.7],
+  ["sancho-hokora",36, 4.5, 1],
+  ["cave-in",      30, 4.7, 1],
+  ["kumo-umi",     40, 8.6],
+  ["taki",       26.5, 9.7],
+  ["tsuribashi",   47, 8.8],
+  ["yama-goya",    31, 13.6, 1],
+  ["onsen-tamago",46.5,13.7, 1],
+  ["ropeway",      53, 12.6],
+  ["tozan-guchi",37.5, 20.8],
+  ["iwa-big",      44, 17.6, 1],
+  ["iwa",          27, 16.6, 1], ["iwa", 52, 7.6, 1],
+  ["yuki-patch",   34, 3.5], ["yuki-patch", 46, 3.2], ["yuki-patch", 42, 6.5]
+];
+for(const d of FUJI_DECO) if(d[3]) solid[Math.floor(d[2])][Math.floor(d[1])]=true;
 /* にじのはしパーク（v11・湖の西のしずかな丘） */
 const MEMORIAL = { gate:[14.5,111.8], hall:[8.5,116], tower:[18,116] };
 for(let y=114;y<116;y++) for(let x=7;x<11;x++) solid[y][x]=true;    /* ホール */
@@ -1213,7 +1247,9 @@ const URA_BUILDINGS = [
   ["ramen-yatai", 95, 39, 2, 1],
   ["shichiya",   114, 38, 3, 2],
   ["uranai",     121, 39, 2, 2],
-  ["koban",      110, 52, 3, 2]
+  ["koban",      110, 52, 3, 2],
+  ["kabu-kaikan",120, 60, 4, 3],
+  ["fudosan",     86, 64, 3, 3]
 ];
 for(const [,btx,bty,bw,bh] of URA_BUILDINGS)
   for(let y=bty;y<bty+bh;y++) for(let x=btx;x<btx+bw;x++) solid[y][x]=true;
@@ -1247,7 +1283,7 @@ function buildMinimap(){
   const g = MINI.getContext("2d");
   for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){
     const v = ground[y][x];
-    g.fillStyle = v==="w" ? "#6ec6e6" : v==="p" ? "#eed9a9" : v==="d" ? "#b07a4a" : v==="f" ? "#a8dd8d" : "#8ecf6f";
+    g.fillStyle = v==="w" ? "#6ec6e6" : v==="p" ? "#eed9a9" : v==="d" ? "#b07a4a" : v==="f" ? "#a8dd8d" : v==="c" ? "#a08054" : "#8ecf6f";
     g.fillRect(x*3, y*3, 3, 3);
   }
   for(const tr of trees){ g.fillStyle = tr.cherry ? "#ff9ec4" : "#4f9c3d"; g.fillRect(tr.tx*3, tr.ty*3, 3, 3); }
@@ -1683,7 +1719,7 @@ function startDialog(v){
       text = v.lines[v.lineI % v.lines.length];
       v.lineI++;
     }
-    if(time - v.lastTalk > 30){ v.love = Math.min(5, v.love + 0.34); v.lastTalk = time; markSave(); }
+    if(time - v.lastTalk > 30){ v.love = Math.min(5, v.love + (kabukiBuffOn("love") ? 0.7 : 0.34)); v.lastTalk = time; markSave(); }
   }
   dialog = { v, text, chars:0 };
   v.state = "idle"; v.wt = 2.5;
@@ -1692,6 +1728,7 @@ function startDialog(v){
 function startFishing(bx,by){
   fishing = { bx, by, sea: by >= 165*T, t:0, biteT:1.5+Math.random()*2.8, state:"wait", hookT:0 };
   if(weather==="ame") fishing.biteT *= 0.55;   /* 雨の日は入れ食い */
+  if(kabukiBuffOn("fish")) fishing.biteT *= 0.6;   /* 桃太郎わんのご利益 */
   splash();
 }
 function endFishing(msg){
@@ -1721,8 +1758,9 @@ function digAt(spot){
   }
   const r = Math.random();
   let msg;
-  if(r < 0.5){ const b = 30+Math.floor(Math.random()*90); bells += b; msg = `🔔 ${b}ベル見つけた！`; coinSfx(); }
-  else if(r < 0.8){ const b = 150+Math.floor(Math.random()*250); bells += b; msg = `🔔 ${b}ベルほり当てた！`; coinSfx(); }
+  const dm = kabukiBuffOn("dig") ? 2 : 1;   /* 鶴の恩返しわんのご利益 */
+  if(r < 0.5){ const b = (30+Math.floor(Math.random()*90))*dm; bells += b; msg = `🔔 ${b}ベル見つけた！`; coinSfx(); }
+  else if(r < 0.8){ const b = (150+Math.floor(Math.random()*250))*dm; bells += b; msg = `🔔 ${b}ベルほり当てた！`; coinSfx(); }
   else if(r < 0.93){ pocket.fossil++; msg = "🦴 化石をほり当てた！"; jingle(); }
   else { bells += 2000; msg = "✨ 金のホネ！！ 2000ベル！"; jingle(); }
   popup = { text: msg, t:2.4 };
@@ -3133,6 +3171,127 @@ document.getElementById("scamPanel").addEventListener("click", e=>{
   markSave();
   scamV = null; scamOffer = null;
 });
+
+/* ================= わんこ富士・わん株・マイホーム・わん座演目（v12） ================= */
+const FUJI_IMG = {};
+["inugami-sama","yama-flag","raicho","graph-up","graph-down","loan-keiyaku",
+ "tsuzumi","kido-fuda","engi-momotaro","engi-tsuru","engi-kaguya"].forEach(n=>{
+  const im = new Image();
+  im.onload = ()=>{ FUJI_IMG[n] = im; };
+  im.src = "sprites/items/fuji/" + n + ".png";
+});
+let lastBlessDay = "", blessT = 0, toucho = 0;
+let homeLevel = 0, loanLeft = 0, lastLoanDay = "";
+const kabuP = {}, kabuH = {};
+let lastKabuDay = "", kabukiBuff = null, engiShow = null;
+const HOME_LOT = { tx:44, ty:35 };
+const HOME_DEFS = [null, ["myhome-s","マイホーム（小）",10000], ["myhome-m","マイホーム（中）",30000], ["myhome-l","マイホーム（大）",80000]];
+function setHomeSolid(){ for(let y=37;y<39;y++) for(let x=44;x<48;x++) solid[y][x]=true; }
+const todayStr = ()=> new Date().toISOString().slice(0,10);
+function blessInugami(){
+  if(lastBlessDay === todayStr()){
+    popup = { text:"⛩ 犬神さまは しずかにねむっている…（ご利益は1日1回）", t:3.4 };
+    return;
+  }
+  lastBlessDay = todayStr(); toucho++;
+  blessT = 6;
+  fanfare(); addCare(15);
+  popup = { text:`⛩ 犬神さま「よくのぼってきたな、ちいさきもの」（お世話指数+15・登頂${toucho}回目）`, t:5.5 };
+  markSave();
+}
+/* わん株 */
+const KABU_DEFS = [["wantech","わんテック"], ["honebank","ほねほね銀行"], ["pochioil","ポチ石油"]];
+function kabuTick(){
+  if(lastKabuDay === todayStr()) return;
+  lastKabuDay = todayStr();
+  for(const [k] of KABU_DEFS){
+    const p = kabuP[k] || 100;
+    kabuP[k] = clamp(Math.round(p * (0.72 + Math.random()*0.62)), 15, 999);
+  }
+  markSave();
+}
+function openKabu(){
+  kabuTick(); uiOpen();
+  shopPanel.style.display = "none"; bookPanel.style.display = "none";
+  casinoP().innerHTML = `
+    <button class="close" data-close="1">✕</button>
+    <h2>📈 わん株取引所</h2>
+    <div>持っているベル：<span class="bells">🔔 ${bells}</span>　<small class="muted">株価は毎日かわる（上がるも下がるも）</small></div>
+    ${KABU_DEFS.map(([k,nm])=>{
+      const p = kabuP[k]||100, q = kabuH[k]||0;
+      const ic = p>=100 ? "fuji/graph-up" : "fuji/graph-down";
+      return `<div class="row"><span class="nm"><img class="icn" src="sprites/items/${ic}.png" onerror="this.remove()">${nm}<br>
+        <small class="muted">株価${p}ベル ・ もち株${q}（評価${p*q}）</small></span>
+        <span style="display:flex;gap:6px;">
+        <button data-kbuy="${k}" ${bells>=p?"":"disabled"}>買う</button>
+        <button data-ksell="${k}" ${q>0?"":"disabled"}>売る</button></span></div>`;
+    }).join("")}`;
+  casinoP().style.display = "block";
+}
+/* マイホーム */
+function openFudosan(){
+  uiOpen();
+  shopPanel.style.display = "none"; bookPanel.style.display = "none";
+  let body = "";
+  if(homeLevel > 0 && loanLeft > 0){
+    body = `<div>ポン蔵「ローンの残りは<b>${loanLeft}ベル</b>ぽん。毎日すこしずつ回収に行くからね」</div>
+      <div class="row"><button data-hpay="1" ${bells>=loanLeft?"":"disabled"} style="flex:1;">くりあげ全額返済（${loanLeft}ベル）</button></div>`;
+  }else if(homeLevel > 0){
+    body = `<div>ポン蔵「${HOME_DEFS[homeLevel][1]}、快適だぽん？ 完済ずみ、あんたはえらい」</div>`;
+  }else{
+    body = HOME_DEFS.slice(1).map((h,i)=>`
+      <div class="row"><span class="nm">${h[1]}<br><small class="muted">価格${h[2]}ベル（ローンは頭金${h[2]/5}＋毎日回収）</small></span>
+      <span style="display:flex;gap:6px;">
+      <button data-hbuy="${i+1}" ${bells>=h[2]?"":"disabled"}>一括</button>
+      <button data-hloan="${i+1}" ${bells>=h[2]/5?"":"disabled"}>ローン</button></span></div>`).join("");
+  }
+  casinoP().innerHTML = `<button class="close" data-close="1">✕</button>
+    <h2>🏠 ポン蔵不動産</h2>
+    <div>持っているベル：<span class="bells">🔔 ${bells}</span></div>` + body;
+  casinoP().style.display = "block";
+}
+/* わん座の演目 */
+const ENGI = [
+  ["engi-momotaro","桃太郎わん","fish","今日はつりの引きがよくなる！"],
+  ["engi-tsuru","鶴の恩返しわん","dig","今日はほり当てのツキがある！"],
+  ["engi-kaguya","かぐや姫わん","love","今日はなかよし度が上がりやすい！"]
+];
+const kabukiBuffOn = t => kabukiBuff && kabukiBuff.d === todayStr() && kabukiBuff.t === t;
+function openEngi(){
+  const [img, name, buff, desc] = ENGI[new Date().getDay() % 3];
+  if(kabukiBuff && kabukiBuff.d === todayStr()){
+    popup = { text:`🎭 本日の観劇はおしまい（「${name}」のご利益が続いてるよ）`, t:3.6 };
+    return;
+  }
+  if(!pay(300)) return;
+  kabukiBuff = { d: todayStr(), t: buff };
+  engiShow = { img, t: 5.5 };
+  fanfare(); addCare(8);
+  popup = { text:`🎭 本日の演目「${name}」！ 大当たりの舞台だった。${desc}（指数+8）`, t:5.5 };
+  markSave();
+}
+/* 山と株と家のスポットを追加 */
+URA_SPOTS.push(
+  {x:31,   y:15,  r:52, label:"🏔 山小屋（ひとやすみ）", f:()=>{ addCare(2); dog.happyT=3; care.hunger=Math.min(100,care.hunger+5); popup={text:"🏔 山小屋でひとやすみ。ストーブがあったかい…（指数+2）",t:3.2}; }},
+  {x:46.5, y:15,  r:46, label:"🥚 温泉たまご（100ベル）", f:()=>{ if(pay(100)){ care.hunger=Math.min(100,care.hunger+20); dog.happyT=3; popup={text:`🥚 あつあつの温泉たまご！ ${dName()}もおすそわけでにっこり`,t:3.4}; } }},
+  {x:36,   y:6,   r:48, label:"⛩ 山頂のほこら（1日1回）", f:blessInugami},
+  {x:122,  y:63,  r:56, label:"📈 わん株取引所", f:openKabu},
+  {x:87.5, y:67,  r:52, label:"🏠 ポン蔵不動産", f:openFudosan}
+);
+/* わん座はえんもくに置きかえ */
+{
+  const kz = URA_SPOTS.find(s=>s.label.startsWith("🎭"));
+  if(kz){ kz.label = "🎭 わん座（本日の演目300ベル）"; kz.f = openEngi; }
+}
+/* 株・家ボタンのクリック（カジノパネルを共用） */
+casinoP().addEventListener("click", e=>{
+  const t = e.target;
+  if(t.dataset.kbuy){ const k=t.dataset.kbuy, p=kabuP[k]||100; if(pay(p)){ kabuH[k]=(kabuH[k]||0)+1; popSound(); markSave(); openKabu(); } }
+  if(t.dataset.ksell){ const k=t.dataset.ksell, p=kabuP[k]||100; if((kabuH[k]||0)>0){ kabuH[k]--; bells+=p; coinSfx(); markSave(); openKabu(); } }
+  if(t.dataset.hbuy){ const lvl=+t.dataset.hbuy; if(pay(HOME_DEFS[lvl][2])){ homeLevel=lvl; setHomeSolid(); jingle(); popup={text:`🏠 ${HOME_DEFS[lvl][1]}を一括購入！ おうちどおりの東に建った！`,t:4.6}; markSave(); closePanels(); } }
+  if(t.dataset.hloan){ const lvl=+t.dataset.hloan; const h=HOME_DEFS[lvl]; if(pay(h[2]/5)){ homeLevel=lvl; loanLeft=h[2]-h[2]/5; setHomeSolid(); popup={text:`🏠 ローン契約ぽん！ ${h[1]}に入居…残り${loanLeft}ベルは毎日ポン蔵が回収に来る（35年ローンの気分を味わおう）`,t:5.5}; markSave(); closePanels(); } }
+  if(t.dataset.hpay){ if(bells>=loanLeft){ bells-=loanLeft; loanLeft=0; fanfare(); popup={text:"🏠 完済！！ ポン蔵「…あんた、ほんとにえらいぽん」（もう回収は来ない）",t:4.6}; markSave(); closePanels(); } }
+});
 const feedBtn = document.getElementById("feedBtn");
 function updateFeedBtn(){ feedBtn.style.display = foodStock>0 ? "flex" : "none"; }
 feedBtn.addEventListener("click", ()=>feedDog());
@@ -3611,6 +3770,9 @@ function update(dt){
   /* --- チュートリアル：歩けたか --- */
   if(tutStep===0 && player.moving){ tutMoveT += dt; if(tutMoveT > 1.1) tutDone(0); }
 
+  if(blessT > 0) blessT -= dt;
+  if(engiShow){ engiShow.t -= dt; if(engiShow.t <= 0) engiShow = null; }
+
   /* --- 勧誘タイマー：ときどき あやしい人が寄ってくる（うらまちでは3倍） --- */
   if(tutStep >= TUT_STEPS.length){
     scamCool -= dt * (player.x > 84*T ? 3 : 1);
@@ -3716,6 +3878,12 @@ function drawGround(){
         if((h + Math.floor(time*1.5))%17===0){
           ctx.fillStyle="#eafaff"; ctx.fillRect(px+9,py+12,3,3);
         }
+      }
+      if(v==="c"){
+        /* 崖 */
+        const gk = TOWN["gake-face"];
+        if(gk) ctx.drawImage(gk, px, py+T-gk.height);
+        else{ ctx.fillStyle="#9a7a54"; ctx.fillRect(px,py,T,T); ctx.fillStyle="#7a5e40"; ctx.fillRect(px,py+T-5,T,5); }
       }
       if(v==="d"){
         /* さんばしの いた */
@@ -4318,6 +4486,30 @@ function drawWorld(){
       if(im) ctx.drawImage(im, Math.round(cx2*T - im.width/2), Math.round(by2*T - im.height));
     }});
   }
+  /* わんこ富士 */
+  for(const [n,cx2,by2] of FUJI_DECO){
+    items.push({y:by2*T, f:()=>{
+      const im = TOWN[n];
+      if(im) ctx.drawImage(im, Math.round(cx2*T - im.width/2), Math.round(by2*T - im.height));
+    }});
+  }
+  if(blessT > 0){
+    items.push({y:5.2*T, f:()=>{
+      const im = FUJI_IMG["inugami-sama"];
+      if(im){
+        ctx.globalAlpha = Math.min(1, blessT/1.5);
+        ctx.drawImage(im, Math.round(36*T - im.width/2), Math.round(3.2*T - im.height + Math.sin(time*1.6)*4));
+        ctx.globalAlpha = 1;
+      }
+    }});
+  }
+  /* マイホーム */
+  if(homeLevel > 0){
+    items.push({y:(HOME_LOT.ty+4)*T, f:()=>{
+      const im = TOWN[HOME_DEFS[homeLevel][0]];
+      if(im) ctx.drawImage(im, Math.round((HOME_LOT.tx+2)*T - im.width/2), Math.round((HOME_LOT.ty+4)*T - im.height));
+    }});
+  }
   /* にじのはしパーク */
   items.push({y:MEMORIAL.gate[1]*T, f:()=>{ const im=TOWN["memorial-gate"]; if(im) ctx.drawImage(im, Math.round(MEMORIAL.gate[0]*T-im.width/2), Math.round(MEMORIAL.gate[1]*T-im.height)); }});
   items.push({y:(MEMORIAL.hall[1])*T, f:()=>{ const im=TOWN["ceremony-hall"]; if(im) ctx.drawImage(im, Math.round(MEMORIAL.hall[0]*T+24-im.width/2+24), Math.round(MEMORIAL.hall[1]*T-im.height)); }});
@@ -4692,6 +4884,19 @@ function drawUI(){
   uictx.fillStyle = "#a8762e";
   uictx.fillText(label3, 7*csc, 30.2*csc);
 
+  /* わん座の演目（観劇の一枚絵） */
+  if(engiShow){
+    const a = Math.min(1, engiShow.t / 0.8);
+    uictx.globalAlpha = a;
+    uictx.fillStyle = "rgba(30,24,20,0.72)";
+    uictx.fillRect(0, 0, wpx, hpx);
+    const bg = TOWN["kabuki-bg"], eg = FUJI_IMG[engiShow.img];
+    const ew = wpx*0.82;
+    if(bg) uictx.drawImage(bg, wpx/2-ew/2, hpx*0.28, ew, ew*bg.height/bg.width);
+    if(eg) uictx.drawImage(eg, wpx/2-ew*0.92/2, hpx*0.31, ew*0.92, ew*0.92*eg.height/eg.width);
+    uictx.globalAlpha = 1;
+  }
+
   /* バージョン表示（左下すみ） */
   uictx.font = `${Math.max(9, 3*csc)}px sans-serif`;
   uictx.fillStyle = "rgba(120,90,70,0.55)";
@@ -4827,6 +5032,7 @@ function drawMinimap(wpx, hpx){
   uictx.fillText("🎡", mx+114*3*scl, my+143*3*scl);
   uictx.fillText("🏮", mx+95*3*scl, my+50*3*scl);
   uictx.fillText("🌈", mx+14*3*scl, my+114*3*scl);
+  uictx.fillText("⛩", mx+40*3*scl, my+5*3*scl);
   uictx.fillText("🎣", mx+40*3*scl, my+114*3*scl);
   uictx.fillText("🌸", mx+11*3*scl, my+145*3*scl);
   /* いまここ（点滅） */
@@ -5061,7 +5267,17 @@ if(lastAbsenceH >= 6 && playerName){
 if(pendingFarewell){
   pendingFarewell = false;
   setTimeout(()=>{ if(!farewell) startFarewell(); }, 4500);
-}else if(pendingWarn){
+}
+/* ポン蔵のローン回収（1日1回） */
+if(loanLeft > 0 && playerName && lastLoanDay !== new Date().toISOString().slice(0,10)){
+  lastLoanDay = new Date().toISOString().slice(0,10);
+  const take = Math.min(500, bells, loanLeft);
+  if(take > 0){
+    bells -= take; loanLeft -= take; markSave();
+    setTimeout(()=>{ popup = { text:`🏠 ポン蔵「ローンの回収だぽん」 −${take}ベル（残り${loanLeft}ベル）`, t:4.6 }; }, 7000);
+  }
+}
+if(false){}else if(pendingWarn){
   pendingWarn = false;
   setTimeout(()=>{
     popup = { text:`⚠ ${dName()}はもう${Math.floor(lastAbsenceH/24)}日ひとりぼっち…このままだと、ほんとうにお別れになっちゃう！`, t:6 };
@@ -5108,6 +5324,7 @@ window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundIte
   openScam, forceScam:(k)=>{ const v=VILLAGERS.find(v=>v.key===k); if(v) v.chase=true; },
   getScamLoss:()=>scamLoss, openJobBoard, getJob:()=>job,
   memorials, farewellTap,
+  blessInugami, openKabu, openFudosan, openEngi, getHome:()=>({homeLevel, loanLeft}), kabuP, kabuH,
   get careScore(){ return careScore; },
   get rankInfo(){ return rankInfo; },
   toggleMap:()=>{ mapOpen = !mapOpen; },
