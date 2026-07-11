@@ -248,6 +248,7 @@
     <div id="cafePanel" class="panel"></div>
     <div id="pachiPanel" class="panel"></div>
     <div id="casinoPanel" class="panel"></div>
+    <div id="scamPanel" class="panel" style="inset:auto 8%; top:14%; z-index:38;"></div>
     <div id="updatePanel" class="panel" style="inset:auto 8%; top:12%; z-index:45;">
       <h2>🆕 アップデートしました！ <small id="updVer" class="muted"></small></h2>
       <div id="updBody"></div>
@@ -296,13 +297,13 @@
 "use strict";
 /* ================= 基本セットアップ ================= */
 /* ================= バージョン（更新のたびに上げる＋内容を書く） ================= */
-const GAME_VER = "1.9.2";
+const GAME_VER = "1.10.0";
 const UPDATE_NOTES = [
-  "🎲 わんわんカジノが本番デザインに！（777ネオンの新店舗）",
-  "🎰 スロットがねこ耳の新筐体＆本物の図柄に、BIG WIN演出も",
-  "🃏 ディーラーのクロエがお出むかえ、ダービーにゲートとゴールテープ"
+  "🏮 川の向こうに「うらまち」誕生！ 橋をわたって東へ",
+  "🎭 わん座（歌舞伎）・♨旅館の湯・🎡わんダーランド・📋おしごと掲示板",
+  "🐍 あやしい住民に注意！ 勧誘は…断る勇気。こまったら交番の銀次へ"
 ];
-const T = 24, MW = 80, MH = 192;     /* 5倍のひろさの街（森・広場・果樹園・大きな湖・海） */
+const T = 24, MW = 136, MH = 192;    /* 大きな街＋東の川向こうに「うらまち」地区 */
 let VW = 320, VH = 240;
 const cvs = document.getElementById("game");
 const ctx = cvs.getContext("2d");
@@ -644,7 +645,12 @@ const TOWN = {};
  /* v8：あそびばストリート */
  "pachinko-hall","gacha-stand","onsen","cafe",
  /* v9：カジノ */
- "casino"].forEach(n=>{
+ "casino",
+ /* v10：うらまち */
+ "yokocho-gate","izakaya","ramen-yatai","shichiya","uranai","denchu","jihanki","koban","gomiyama","neon-kanban",
+ "kabukiza","kabuki-maku","kabuki-chochin","ryokan","onsen-gate","ashiyu","taruburo","sento-noren",
+ "kanransha","merry","coffee-cup","obakeyashiki","wonder-gate","fuusen-wagon","popcorn","wonder-kanban",
+ "quest-board","kabu-board","kawa-hashi","taki","iwa","iwa-big"].forEach(n=>{
   const im = new Image();
   im.onload = ()=>{ TOWN[n] = im; };
   im.src = "sprites/town/" + n + ".png";
@@ -711,6 +717,8 @@ const FOODBOWL = new Image(); FOODBOWL.src = "sprites/items/food/bowl-full.png";
 const POOPIMG = new Image(); POOPIMG.src = "sprites/items/care/poop.png";
 
 const SHEET_NAMES = ["girl","dog","moka","mike","kerota","penta","tonko","meeko","mimii","noron",
+  /* v10 うらまちの住民 */
+  "kitsune-shoji","hebi-mulch","tanuki-fudosan","karasu-shichiya","itachi-uranai","buta-shacho","nezumi-joho","ookami-yojinbo",
   /* v6 新住民30体 */
   "konta","ponkichi","ririsu","paopao","koaran","hamujiro","harry","ho-chan","ga-ko","meemee",
   "mo-san","poniko","chuta","mogurin","kawacchi","flamie","kumagoro","pakarun","rakkosuke","kamekichi",
@@ -963,7 +971,7 @@ function doSave(){
       bells, hasBall, bandana, petCount, playerName, dogName, raceWins, dogBreed,
       accessory, fashionOwned, furnInv, placedFurn,
       foodStock, medCount, care, poops, savedAt: Date.now(),
-      careScore, playerId, lastPlayDay, spirit, tut: tutStep, promised, lastSeenVer,
+      careScore, playerId, lastPlayDay, spirit, tut: tutStep, promised, lastSeenVer, scamLoss,
       apple:pocket.apple, fossil:pocket.fossil,
       fishInv, bugInv,
       caughtFish:[...caughtFish], caughtBug:[...caughtBug],
@@ -989,6 +997,7 @@ function loadSave(){
     tutStep = d.tut != null ? d.tut : (d.playerName ? 99 : 0);   /* 既存プレイヤーはスキップ */
     promised = d.promised != null ? d.promised : !!d.playerName;  /* 名前登録ずみなら約束ずみ扱い */
     lastSeenVer = d.lastSeenVer || "";
+    scamLoss = d.scamLoss || 0;
     foodStock = d.foodStock||0; medCount = d.medCount||0;
     if(d.care) Object.assign(care, d.care);
     if(!playerName) care.stage = "puppy";               /* はじめてなら こいぬから */
@@ -1061,6 +1070,18 @@ for(let x=32;x<49;x++) if(ground[110][x]==="g") ground[110][x]="f";             
 /* ひみつのはなばたけ（にしの おく） */
 for(let y=142;y<149;y++) for(let x=4;x<19;x++) if(ground[y][x]==="g") ground[y][x]="f";
 
+/* おおきな川（x80〜83・東地区とのさかい）→ 海へそそぐ */
+for(let y=2;y<166;y++) for(let x=80;x<84;x++){ ground[y][x]="w"; solid[y][x]=true; }
+/* 橋3本（木橋で川をわたる） */
+for(const by of [44,45, 88,89, 134,135]) for(let x=80;x<84;x++){ ground[by][x]="d"; solid[by][x]=false; }
+/* うらまち地区のみち */
+for(let x=84;x<133;x++){ setPath(x,44); setPath(x,45); }       /* うらまち大通り */
+for(let x=84;x<133;x++){ setPath(x,88); setPath(x,89); }       /* わん座どおり */
+for(let x=84;x<133;x++){ setPath(x,134); setPath(x,135); }     /* ゆけむりどおり */
+for(let y=32;y<156;y++){ setPath(107,y); setPath(108,y); }     /* 東のメインストリート */
+for(let y=32;y<45;y++){ setPath(90,y); setPath(91,y); }        /* 横丁のろじ */
+for(let y=45;y<62;y++) for(let x=86;x<106;x++) setPath(x,y);   /* 歓楽街の広場 */
+
 /* うみ（みなみ）：すなはま＋うみ */
 for(let y=156;y<166;y++) for(let x=1;x<MW-1;x++) if(ground[y][x]==="g") ground[y][x]="p";  /* すなはま */
 for(let y=166;y<MH;y++) for(let x=0;x<MW;x++){ ground[y][x]="w"; solid[y][x]=true; }
@@ -1094,8 +1115,11 @@ function addTree(tx,ty,cherry){
   solid[ty][tx]=true;
 }
 /* まわりの木のかべ */
-for(let x=2;x<78;x+=3) addTree(x,1);
-for(let y=4;y<154;y+=3){ addTree(1,y); addTree(78,y); }
+for(let x=2;x<134;x+=3) addTree(x,1);
+for(let y=4;y<154;y+=3){ addTree(1,y); addTree(134,y); }
+/* うらまち地区の木・さくら */
+[[88,34],[120,34],[124,50],[86,64],[126,64],[90,80],[124,80],[86,100],[126,100],[90,120],[124,120],[100,150],[116,150]]
+  .forEach(p=>addTree(p[0],p[1], p[1]>=100));
 /* おおきな森（きた） */
 [[6,5],[12,8],[18,4],[24,9],[30,6],[36,10],[44,5],[50,9],[56,6],[62,11],[70,7],[74,4],
  [8,14],[16,18],[26,15],[34,20],[46,16],[54,21],[64,17],[72,23],[12,26],[28,24],[42,27],[58,26],[70,28],
@@ -1145,6 +1169,42 @@ for(let y=56;y<59;y++) for(let x=62;x<66;x++) solid[y][x]=true;
 /* わんわんカジノ（v9） */
 const CASINO = { tx:62, ty:64 };
 for(let y=65;y<68;y++) for(let x=62;x<66;x++) solid[y][x]=true;
+/* うらまち地区の建物（v10）：[画像, tx, 立ち入り不可の上端ty, 幅タイル, 高さタイル] */
+const URA_BUILDINGS = [
+  ["kabukiza",    96, 66, 8, 3],
+  ["ryokan",      88,120, 5, 3],
+  ["kanransha",  111,141, 6, 3],
+  ["merry",       88,143, 4, 2],
+  ["obakeyashiki",120,142, 4, 3],
+  ["izakaya",     86, 38, 3, 2],
+  ["ramen-yatai", 95, 39, 2, 1],
+  ["shichiya",   114, 38, 3, 2],
+  ["uranai",     121, 39, 2, 2],
+  ["koban",      110, 52, 3, 2]
+];
+for(const [,btx,bty,bw,bh] of URA_BUILDINGS)
+  for(let y=bty;y<bty+bh;y++) for(let x=btx;x<btx+bw;x++) solid[y][x]=true;
+/* うらまちの小物かざり：[画像, 中心x, 足元y, solid?] */
+const URA_DECO = [
+  ["yokocho-gate", 90.5, 33.8],
+  ["denchu",       87.5, 47.5, 1], ["denchu", 104.5, 57.5, 1],
+  ["jihanki",     100.5, 39.8, 1],
+  ["gomiyama",    118.5, 47.8, 1],
+  ["neon-kanban",  92.5, 50.5, 1],
+  ["kabuki-chochin",94.5, 87.5],
+  ["onsen-gate",  107.5,118.5],
+  ["ashiyu",       96.5,126.8, 1],
+  ["taruburo",    100.5,130.8, 1],
+  ["sento-noren",  94.5,122.5],
+  ["wonder-gate", 107.5,139.5],
+  ["coffee-cup",  100.5,148.8, 1],
+  ["popcorn",      96.5,146.5, 1],
+  ["fuusen-wagon",116.5,148.5, 1],
+  ["wonder-kanban",110.5,146.3],
+  ["quest-board",  88.5, 46.4, 1],
+  ["kabu-board",  116.5, 55.7, 1]
+];
+for(const d of URA_DECO) if(d[3]) solid[Math.floor(d[2])][Math.floor(d[1])]=true;
 
 /* ミニマップ（地形を1回だけ描いておく） */
 let MINI = null;
@@ -1249,6 +1309,22 @@ const NEWCOMERS = [
  ["lionmaru","ライオン丸","#d8a048",94, 70.5,92.5, 320,["百じゅうの王…だけど、この町では のんびり屋","たてがみの 手入れ、たいへんなんだぞ","ガオーの練習、聞いてくれる？"]],
  ["komorin","こもりん","#8a7aa8",95, 74.5,16.5, 700,["さかさまから こんにちは！","夜行せいだけど、みんなに会いたくて…","はねで つつむと あったかいんだよ"]]
 ];
+/* v10：うらまちの住民（いつでもいる。わるい人ほどにこにこしている） */
+const URA_RESIDENTS = [
+ ["kitsune-shoji","コンさん","#e8a54e", 92.5,54.5, 340,["やあやあ、キミ、運がいいねえ！","もうかる話にはコツがあるのさ","このDVD、ほんとはひみつなんだけど…"]],
+ ["hebi-mulch","ニョロ美","#8fd06c", 100.5,50.5, 720,["ね、いまのくらしに満足してる〜？","友だちの友だちはみーんな家族♪","夢、かなえたくない〜？"]],
+ ["nezumi-joho","チュー吉","#9a9aa8", 88.5,58.5, 780,["…いい情報、あるよ。安くしとくよ","この町の裏は、ぜんぶ知ってるチュー","（きょろきょろ）"]],
+ ["itachi-uranai","ミスティ","#b48ee0", 122.5,42.5, 520,["星がね、あなたを呼んでいたの","水晶玉はうそをつかないわ…たぶん","運命、のぞいてみない？"]],
+ ["karasu-shichiya","九兵衛","#5a5a6a", 115.5,41.5, 300,["カァ。質草はなんでも見せてみな","即金がほしけりゃ質屋にかぎる","にせものは一目でわかるぜ"]],
+ ["tanuki-fudosan","ポン蔵","#c98b4e", 96.5,47.5, 360,["いい物件あるよ〜、頭金だけでいいから！","ローンは35年、あっという間ぽん","家は買うまでが夢なんだなあ"]],
+ ["buta-shacho","トン重役","#e88ba8", 118.5,58.5, 280,["わが社は急成長中でねえ、ブヒ","きみ、うちで働かないかね？","時は金なり、金は金なりブヒ"]],
+ ["ookami-yojinbo","銀次","#7a8a9a", 110.5,54.8, 320,["…この町にも、わるいやつはいる","こまったら交番に来な","うまい話ほど、よくかみつけ"]]
+];
+for(const [key,name,tag,tx,ty,pitch,lines] of URA_RESIDENTS){
+  VILLAGERS.push({ name, key, tag, pitch, lines,
+    img: makeVillager(HEAD_BEAR, {s:"#c9a67a", m:"#e8d4b0", T:"#8a8a9a", t:"#b3b3c4"}),
+    hx:tx*T, hy:ty*T });
+}
 for(const [key,name,tag,minSpirit,tx,ty,pitch,lines] of NEWCOMERS){
   VILLAGERS.push({ name, key, tag, minSpirit, pitch, lines,
     img: makeVillager(HEAD_BEAR, {s:"#c9a67a", m:"#e8d4b0", T:"#9fc4e8", t:"#c4dcf2"}),
@@ -1507,6 +1583,27 @@ function dirVec(){
 }
 function startDialog(v){
   tutDone(3);
+  /* 勧誘員に自分から話しかけても勧誘される */
+  if(SCAMMERS[v.key]){ openScam(v); return; }
+  /* おしごと：小包のおとどけ完了 */
+  if(job && job.to === v.key){
+    bells += job.reward; addCare(6); coinSfx();
+    const text2 = `わあ、小包だ！ ありがとう！ お礼に${job.reward}ベルどうぞ♪`;
+    job = null; markSave();
+    dialog = { v, text: text2, chars: 0 };
+    v.state = "idle"; v.wt = 2.5;
+    uiOpen();
+    return;
+  }
+  /* 銀次のクーリングオフ */
+  if(v.key === "ookami-yojinbo" && scamLoss > 0){
+    const back = Math.floor(scamLoss/2);
+    bells += back; scamLoss = 0; markSave(); coinSfx();
+    dialog = { v, text:`…被害届だな。クーリングオフで${back}ベル取りかえしてやった。うまい話ほど、よくかみつけ。`, chars:0 };
+    v.state = "idle"; v.wt = 2.5;
+    uiOpen();
+    return;
+  }
   let text;
   if(v.quest && questHave(v.quest)){
     questConsume(v.quest);
@@ -1691,6 +1788,11 @@ function tryAction(){
   {
     const d = dist(player.x,player.y, (CASINO.tx+2)*T, (CASINO.ty+3.6)*T);
     if(d < 56) cands.push({d:d*0.85, f:openCasino});
+  }
+  /* うらまちの施設 */
+  for(const s of URA_SPOTS){
+    const d = dist(player.x,player.y, s.x*T, s.y*T);
+    if(d < s.r) cands.push({d:d*0.85, f:s.f});
   }
   /* むし */
   for(const b of bugs){
@@ -2837,7 +2939,94 @@ function drawCasino(){
   ctx.fillText("♠", x+20, y+51); ctx.fillText("♥", x+76, y+51); ctx.textAlign="left";
 }
 
-/* ================= おせわ（たまごっち） ================= */
+/* ================= うらまち：勧誘・おしごと・アトラクション（v10） ================= */
+const SCAMMERS = {"kitsune-shoji":1, "hebi-mulch":1, "nezumi-joho":1, "itachi-uranai":1};
+let scamLoss = 0, scamCool = 75, job = null;
+function pay(c){
+  if(bells < c){ floatTexts.push({x:player.x, y:player.y-20, text:`${c}ベルが必要…`, t:1.4}); return false; }
+  bells -= c; markSave(); return true;
+}
+function ride(cost, cg, msg){
+  if(!pay(cost)) return;
+  addCare(cg); jingle(); dog.happyT = 3; dog.jumpT = 0.45;
+  popup = { text:`${msg}（お世話指数+${cg}）`, t:3.6 };
+}
+function openJobBoard(){
+  if(job){ popup = { text:`📋 いまのおしごと：${job.desc}`, t:3.4 }; return; }
+  const cs = VILLAGERS.filter(v=>!v.tourist && !SCAMMERS[v.key] && v.key!=="ookami-yojinbo" && vActive(v));
+  const tgt = cs[Math.floor(Math.random()*cs.length)];
+  const reward = 300 + Math.floor(Math.random()*4)*100;
+  job = { to: tgt.key, desc:`${tgt.name}さんに小包をとどける（+${reward}ベル）`, reward };
+  popup = { text:`📋 おしごとをうけおった！ ${job.desc}`, t:4.2 };
+  popSound();
+}
+const URA_SPOTS = [
+  {x:88.5, y:46.4, r:42, label:"📋 おしごと掲示板", f:openJobBoard},
+  {x:100,  y:69,   r:70, label:"🎭 わん座（観劇300ベル）", f:()=>ride(300, 8, "🎭 隈取りのしば犬が見得を切った！ 大向こうから「わんや！」")},
+  {x:90.5, y:123,  r:60, label:"♨ 旅館の湯（300ベル）", f:()=>{ if(pay(300)){ care.growth+=15; checkGrowth(); addCare(10); splash(); dog.happyT=4; popup={text:`♨ 極楽の湯…${dName()}は頭にタオルをのせて とろっとろ（指数+10）`,t:3.8}; } }},
+  {x:114,  y:144,  r:66, label:"🎡 観覧車（200ベル）", f:()=>ride(200, 5, "🎡 てっぺんから海も湖もぜんぶ見えた！")},
+  {x:90,   y:145,  r:50, label:"🎠 メリーゴーランド（150ベル）", f:()=>ride(150, 4, "🎠 犬の木馬でくるくる♪")},
+  {x:122,  y:145,  r:54, label:"👻 お化け屋敷（250ベル）", f:()=>ride(250, 6, "👻 こわかわいい おばけがいっぱいだった…")}
+];
+/* --- 勧誘イベント --- */
+let scamV = null;
+function openScam(v){
+  uiOpen();
+  scamV = v;
+  const sp = document.getElementById("scamPanel");
+  let body = "";
+  if(v.key==="kitsune-shoji") body = `
+    <div>「ここだけの話…この<b>必勝DVD</b>、見るだけでベルがザックザク！ いまなら<b>たったの3000ベル</b>！」</div>
+    <div class="row"><button data-scam="dvd" ${bells>=3000?"":"disabled"} style="flex:1;">買う（3000ベル）</button></div>`;
+  if(v.key==="hebi-mulch") body = `
+    <div>「<b>会員になるだけ</b>で、友だちを紹介するたびもうかるの♪ 入会金は<b>2000ベル</b>だけ〜」</div>
+    <div class="row"><button data-scam="mulch" ${bells>=2000?"":"disabled"} style="flex:1;">入会する（2000ベル）</button></div>`;
+  if(v.key==="nezumi-joho") body = `
+    <div>「…とっておきの<b>たから情報</b>、あるよ。<b>500ベル</b>でどう？」</div>
+    <div class="row"><button data-scam="joho" ${bells>=500?"":"disabled"} style="flex:1;">買う（500ベル）</button></div>`;
+  if(v.key==="itachi-uranai") body = `
+    <div>「ふふ…あなたの明日、<b>水晶玉</b>にうつってるわ。<b>500ベル</b>で見せてあげる」</div>
+    <div class="row"><button data-scam="uranai" ${bells>=500?"":"disabled"} style="flex:1;">占ってもらう（500ベル）</button></div>`;
+  sp.innerHTML = `<h2>${v.name}が近づいてきた…</h2>` + body +
+    `<div class="row"><button data-scam="refuse" style="flex:1; background:#8a9a8a;">きっぱり断る</button></div>`;
+  sp.style.display = "block";
+}
+document.getElementById("scamPanel").addEventListener("click", e=>{
+  const k = e.target.dataset.scam;
+  if(!k) return;
+  const sp = document.getElementById("scamPanel");
+  sp.style.display = "none"; uiClose();
+  if(k==="refuse"){
+    addCare(5);
+    popup = { text:"👀 あやしさを見抜いた！ えらい！（お世話指数+5）", t:3.4 };
+    jingle();
+  }else if(k==="dvd" && pay(3000)){
+    scamLoss += 3000;
+    popup = { text:"📀 家で見たら『毎日お散歩しよう』とだけ映っていた…（-3000ベル）こまったら交番の銀次へ", t:4.6 };
+    noiseSfx(0.2, 0.06, 500, 150);
+  }else if(k==="mulch" && pay(2000)){
+    scamLoss += 2000;
+    for(const v2 of VILLAGERS) if(!v2.tourist && !SCAMMERS[v2.key]) v2.love = Math.max(0, v2.love - 0.5);
+    popup = { text:"🐍 会員になった…でも紹介できる友だちはいない。町のみんなが少しよそよそしい（-2000ベル）", t:4.6 };
+    noiseSfx(0.2, 0.06, 500, 150);
+  }else if(k==="joho" && pay(500)){
+    if(Math.random() < 0.5){
+      digSpots.push({tx: clamp(Math.floor(player.x/T)+2, 2, MW-3), ty: clamp(Math.floor(player.y/T)+1, 2, MH-3)});
+      popup = { text:"🐭 情報は本物だった！ 近くがキラキラしてる…ほってみよう！", t:4 };
+      jingle();
+    }else{
+      scamLoss += 500;
+      popup = { text:"🐭『情報は生ものだからね』…なにも見つからなかった（-500ベル）", t:4 };
+    }
+  }else if(k==="uranai" && pay(500)){
+    const r = Math.random();
+    if(r < 0.3){ addCare(5); popup = { text:"🔮「大吉よ！」なんだか元気が出た（お世話指数+5）", t:3.6 }; jingle(); }
+    else if(r < 0.6) popup = { text:"🔮「中吉。犬にやさしくすると吉」…いつもやってるが？", t:3.6 };
+    else popup = { text:"🔮「凶。今夜のラーメン屋台に気をつけて」…どういうこと？", t:3.6 };
+  }
+  markSave();
+  scamV = null;
+});
 const feedBtn = document.getElementById("feedBtn");
 function updateFeedBtn(){ feedBtn.style.display = foodStock>0 ? "flex" : "none"; }
 feedBtn.addEventListener("click", ()=>feedDog());
@@ -3151,6 +3340,16 @@ function update(dt){
     const nearPlayer = dist(player.x,player.y, v.x,v.y) < 42;
     if(dialog && dialog.v === v){ v.state = "idle"; continue; }
     if(!vActive(v)){ v.state = "idle"; v.x = v.hx; v.y = v.hy; v.tx = v.hx; v.ty = v.hy; continue; }
+    /* 勧誘員がプレイヤーへ寄ってくる */
+    if(v.chase){
+      v.state = "walk"; v.walkT += dt;
+      const dxx = player.x - v.x, dyy = player.y - v.y, dd = Math.hypot(dxx, dyy) || 1;
+      const spd = 96*dt;
+      v.x += dxx/dd*spd; v.y += dyy/dd*spd;
+      v.tx = player.x; v.ty = player.y;
+      if(dd < 34){ v.chase = false; if(!dialog && !fishing) openScam(v); }
+      continue;
+    }
     if(phase.night > 0.85){ v.state = "idle"; continue; }   /* よふけは しずかに おやすみ */
     v.wt -= dt;
     if(nearPlayer){ v.state = "idle"; v.wt = Math.max(v.wt, 0.6); }
@@ -3294,6 +3493,24 @@ function update(dt){
 
   /* --- チュートリアル：歩けたか --- */
   if(tutStep===0 && player.moving){ tutMoveT += dt; if(tutMoveT > 1.1) tutDone(0); }
+
+  /* --- 勧誘タイマー：ときどき あやしい人が寄ってくる（うらまちでは3倍） --- */
+  if(tutStep >= TUT_STEPS.length){
+    scamCool -= dt * (player.x > 84*T ? 3 : 1);
+    if(scamCool <= 0){
+      scamCool = 200 + Math.random()*160;
+      if(!dialog && !race && !pachi && !slot && !derby && !fishing && !farewell &&
+         document.getElementById("scamPanel").style.display !== "block"){
+        const sc = VILLAGERS.filter(v=>SCAMMERS[v.key]);
+        let near = null, nd = 1e9;
+        for(const s of sc){ const d = dist(s.x, s.y, player.x, player.y); if(d < nd){ nd = d; near = s; } }
+        if(near && nd < 520){
+          near.chase = true;
+          floatTexts.push({x:near.x, y:near.y-26, text:"❗", t:1.4});
+        }
+      }
+    }
+  }
 
   /* --- オートセーブ --- */
   saveTimer -= dt;
@@ -3970,6 +4187,20 @@ function drawWorld(){
   items.push({y:(ONSEN.ty+4)*T, f:drawOnsen});
   items.push({y:(CAFE.ty+4)*T, f:drawCafe});
   items.push({y:(CASINO.ty+4)*T, f:drawCasino});
+  /* うらまちの建物・かざり */
+  for(const [n,btx,bty,bw,bh] of URA_BUILDINGS){
+    items.push({y:(bty+bh)*T, f:()=>{
+      const im = TOWN[n];
+      if(im) ctx.drawImage(im, Math.round((btx+bw/2)*T - im.width/2), Math.round((bty+bh)*T - im.height));
+      else{ ctx.fillStyle="#8a8a9a"; ctx.fillRect(btx*T, bty*T, bw*T, bh*T); }
+    }});
+  }
+  for(const [n,cx2,by2] of URA_DECO){
+    items.push({y:by2*T, f:()=>{
+      const im = TOWN[n];
+      if(im) ctx.drawImage(im, Math.round(cx2*T - im.width/2), Math.round(by2*T - im.height));
+    }});
+  }
   /* きらきらの まち：おいわいの かざりつけ */
   if(spiritTier()===3){
     const D = (n, cx, by, bob)=>{
@@ -4123,6 +4354,10 @@ function drawWorld(){
     hole((ONSEN.tx+2)*T, (ONSEN.ty+2)*T, 60, 0.6);
     hole((CAFE.tx+2)*T, (CAFE.ty+2)*T, 60, 0.6);
     hole((CASINO.tx+2)*T, (CASINO.ty+2)*T, 78, 0.85);                                /* カジノの777ネオン */
+    hole(100*T, 67*T, 90, 0.8);   /* わん座 */
+    hole(90.5*T, 121*T, 70, 0.7); /* 旅館 */
+    hole(95*T, 50*T, 85, 0.8);    /* うらまち横丁のネオン */
+    hole(114*T, 143*T, 80, 0.7);  /* 観覧車 */
     for(const pf of placedFurn){
       if(pf.n==="takibi") hole(pf.tx*T+12, pf.ty*T+12, 78, 0.95);                    /* たき火 */
       if(pf.n==="tourou") hole(pf.tx*T+12, pf.ty*T+6, 46, 0.8);                      /* 石とうろう */
@@ -4248,6 +4483,14 @@ function drawUI(){
     if(d < 56 && !dialog){
       const [sx,sy] = W2S((CASINO.tx+2)*T, CASINO.ty*T-8);
       bubble(sx, sy, "🎲 わんわんカジノ", sc, true);
+    }
+  }
+  if(!dialog) for(const s of URA_SPOTS){
+    const d = dist(player.x,player.y, s.x*T, s.y*T);
+    if(d < s.r){
+      const [sx,sy] = W2S(s.x*T, (s.y-3.4)*T);
+      bubble(sx, sy, s.label, sc, true);
+      break;
     }
   }
   const dsh = dogSheet();
@@ -4445,6 +4688,9 @@ function drawMinimap(wpx, hpx){
   uictx.fillText("🎰", mx+(PACHINKO.tx+2)*3*scl, my+(PACHINKO.ty+1.5)*3*scl);
   uictx.fillText("♨", mx+(ONSEN.tx+2)*3*scl, my+(ONSEN.ty+1.5)*3*scl);
   uictx.fillText("🎲", mx+(CASINO.tx+2)*3*scl, my+(CASINO.ty+2)*3*scl);
+  uictx.fillText("🎭", mx+100*3*scl, my+67*3*scl);
+  uictx.fillText("🎡", mx+114*3*scl, my+143*3*scl);
+  uictx.fillText("🏮", mx+95*3*scl, my+50*3*scl);
   uictx.fillText("🎣", mx+40*3*scl, my+114*3*scl);
   uictx.fillText("🌸", mx+11*3*scl, my+145*3*scl);
   /* いまここ（点滅） */
@@ -4640,6 +4886,8 @@ window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundIte
   getTut:()=>tutStep, tutDone,
   openPachinko, startPachi, pachiTap, pachiRetry, playGacha, getPachi:()=>pachi, useOnsen, openCafe,
   openCasino, startSlot, slotTap, getSlot:()=>slot, startHilo, hiloGuess, startDerby, derbyTap, getDerby:()=>derby,
+  openScam, forceScam:(k)=>{ const v=VILLAGERS.find(v=>v.key===k); if(v) v.chase=true; },
+  getScamLoss:()=>scamLoss, openJobBoard, getJob:()=>job,
   get careScore(){ return careScore; },
   get rankInfo(){ return rankInfo; },
   toggleMap:()=>{ mapOpen = !mapOpen; },
