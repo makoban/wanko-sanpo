@@ -297,11 +297,11 @@
 "use strict";
 /* ================= 基本セットアップ ================= */
 /* ================= バージョン（更新のたびに上げる＋内容を書く） ================= */
-const GAME_VER = "1.11.0";
+const GAME_VER = "1.12.0";
 const UPDATE_NOTES = [
-  "🌦 町の天気が「あなたの今いる場所のほんとうの天気」とシンクロ！",
-  "🦊 勧誘に“本物のお得”がまざるように。話し方で見抜こう",
-  "💰 「袋を運ぶだけ」の甘いおしごとは受け子のワナ…！"
+  "🌈 湖の西に「にじのはしパーク」…おわかれの日のための、静かな丘",
+  "🕯 最悪のパターンには お葬式と虹の橋の おみおくりを。お墓は永遠に残ります",
+  "⚠ 5日ほうっておくと住民が本気で心配します。そうなる前に、会いに来てね"
 ];
 const T = 24, MW = 136, MH = 192;    /* 大きな街＋東の川向こうに「うらまち」地区 */
 let VW = 320, VH = 240;
@@ -402,6 +402,7 @@ stage.addEventListener("touchstart", e=>{
   if(pachi){ pachiTap(); e.preventDefault(); return; }
   if(slot){ slotTap(); e.preventDefault(); return; }
   if(derby){ derbyTap(); e.preventDefault(); return; }
+  if(farewell){ farewellTap(); e.preventDefault(); return; }
   /* ちずが ひらいていたら とじる */
   if(mapOpen){ mapOpen = false; uiClose(); e.preventDefault(); return; }
   /* パネルが ひらいているとき、そとをタップしたら とじるだけ */
@@ -650,7 +651,9 @@ const TOWN = {};
  "yokocho-gate","izakaya","ramen-yatai","shichiya","uranai","denchu","jihanki","koban","gomiyama","neon-kanban",
  "kabukiza","kabuki-maku","kabuki-chochin","ryokan","onsen-gate","ashiyu","taruburo","sento-noren",
  "kanransha","merry","coffee-cup","obakeyashiki","wonder-gate","fuusen-wagon","popcorn","wonder-kanban",
- "quest-board","kabu-board","kawa-hashi","taki","iwa","iwa-big"].forEach(n=>{
+ "quest-board","kabu-board","kawa-hashi","taki","iwa","iwa-big",
+ /* v11：おみおくり */
+ "ceremony-hall","okuri-tower","memorial-gate","ohaka","ohaka-hana","saidan"].forEach(n=>{
   const im = new Image();
   im.onload = ()=>{ TOWN[n] = im; };
   im.src = "sprites/town/" + n + ".png";
@@ -944,7 +947,15 @@ let foodStock = 0, medCount = 0;
 const care = { hunger: 85, stage: "adult", growth: 0, sick: false, sickT: 0, hungryT: 0, poopT: 0, lastPetG: -99 };
 const poops = [];
 let poopTimer = 0, feedAnimT = 0, dogIdleT = 0, farewell = null;
-let lastAbsenceH = 0, pendingFarewell = false;
+const memorials = [];   /* 旅立ったわんこたち {n:名前, b:犬種, d:日付} */
+const OMIO_IMG = {};
+["iei-frame","kiku","candle","juushoku-inu","mofuku-ribbon","mizu-bowl","ohaka-hikari",
+ "tenshi-wanko","hoshi-kira","niji-hashi"].forEach(n=>{
+  const im = new Image();
+  im.onload = ()=>{ OMIO_IMG[n] = im; };
+  im.src = "sprites/items/omiokuri/" + n + ".png";
+});
+let lastAbsenceH = 0, pendingFarewell = false, pendingWarn = false;
 function fmtAbsence(h){
   if(h >= 24) return `${Math.floor(h/24)}日と${Math.floor(h%24)}時間`;
   if(h >= 1) return `${Math.floor(h)}時間`;
@@ -966,6 +977,7 @@ function applyAbsence(offH){
   if(offH >= 48 && !care.sick){ care.sick = true; care.sickT = 0; }
   if(care.sick && offH >= 72) care.sickT = Math.max(care.sickT, Math.min(480, (offH-72)*8));
   if(offH >= 168) pendingFarewell = true;   /* 1しゅうかん ほったらかすと… */
+  else if(offH >= 120) pendingWarn = true;  /* 5日目：本気の警告 */
 }
 function dogMood(){
   return care.sick ? "sick" : (care.hunger < 25 || poops.length >= 3) ? "sad" : "ok";
@@ -984,7 +996,7 @@ function doSave(){
     for(const v of VILLAGERS) love[v.key] = v.love;
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       bells, hasBall, bandana, petCount, playerName, dogName, raceWins, dogBreed,
-      accessory, fashionOwned, furnInv, placedFurn,
+      accessory, fashionOwned, furnInv, placedFurn, memorials,
       foodStock, medCount, care, poops, savedAt: Date.now(),
       careScore, playerId, lastPlayDay, spirit, tut: tutStep, promised, lastSeenVer, scamLoss,
       apple:pocket.apple, fossil:pocket.fossil,
@@ -1007,6 +1019,7 @@ function loadSave(){
     Object.assign(fashionOwned, d.fashionOwned||{});
     Object.assign(furnInv, d.furnInv||{});
     if(Array.isArray(d.placedFurn)) placedFurn.push(...d.placedFurn.slice(0,60));
+    if(Array.isArray(d.memorials)) memorials.push(...d.memorials.slice(0,24));
     careScore = d.careScore||0; playerId = d.playerId||""; lastPlayDay = d.lastPlayDay||"";
     if(d.spirit != null) spirit = clamp(d.spirit, 0, 100);
     tutStep = d.tut != null ? d.tut : (d.playerName ? 99 : 0);   /* 既存プレイヤーはスキップ */
@@ -1181,6 +1194,11 @@ const ONSEN = { tx:62, ty:48 };
 for(let y=49;y<52;y++) for(let x=62;x<66;x++) solid[y][x]=true;
 const CAFE = { tx:62, ty:55 };
 for(let y=56;y<59;y++) for(let x=62;x<66;x++) solid[y][x]=true;
+/* にじのはしパーク（v11・湖の西のしずかな丘） */
+const MEMORIAL = { gate:[14.5,111.8], hall:[8.5,116], tower:[18,116] };
+for(let y=114;y<116;y++) for(let x=7;x<11;x++) solid[y][x]=true;    /* ホール */
+for(let y=114;y<116;y++) for(let x=17;x<20;x++) solid[y][x]=true;   /* おみおくりの塔 */
+const graveXY = i => [ (13 + (i%4)*2) , (119.5 + Math.floor(i/4)*2.5) ];
 /* わんわんカジノ（v9） */
 const CASINO = { tx:62, ty:64 };
 for(let y=65;y<68;y++) for(let x=62;x<66;x++) solid[y][x]=true;
@@ -1637,6 +1655,9 @@ function startDialog(v){
     text = `ねえ、${dName()}がおなかをすかせてるよ…。ごはんをあげてね`;
   }else if(poops.length >= 2){
     text = `お散歩道がよごれてるよ〜。${dName()}のためにきれいにしようね`;
+  }else if(lastAbsenceH >= 120 && !v.saidOkaeri){
+    v.saidOkaeri = true;
+    text = `おねがい、${dName()}をもっと見てあげて。…もう時間がないの。ほんとうに、いなくなっちゃうんだよ`;
   }else if(lastAbsenceH >= 24 && !v.saidOkaeri){
     v.saidOkaeri = true;
     text = `おかえり ${pName()}！ ${dName()}、${fmtAbsence(lastAbsenceH)}もずっと待ってたんだよ`
@@ -1809,6 +1830,25 @@ function tryAction(){
     const d = dist(player.x,player.y, s.x*T, s.y*T);
     if(d < s.r) cands.push({d:d*0.85, f:s.f});
   }
+  /* お墓まいり */
+  memorials.forEach((m,i)=>{
+    const [gx,gy] = graveXY(i);
+    const d = dist(player.x,player.y, gx*T, gy*T);
+    if(d < 30) cands.push({d:d*0.8, f:()=>{
+      const memories = [
+        `（${m.n}との はじめてのお散歩を おもいだした…）`,
+        `（${m.n}は ボールあそびが だいすきだった）`,
+        `（${m.n}の しっぽの音が きこえた気がする）`,
+        `（${m.n}、むこうでも 元気にしてるかな）`
+      ];
+      popup = { text:`🌼 ${m.n}のお墓に手をあわせた。${memories[Math.floor(Math.random()*memories.length)]}`, t:4.6 };
+      addCare(3);
+      const hi = OMIO_IMG["ohaka-hikari"];
+      hearts.push({x:gx*T, y:gy*T-24, vy:-16, life:1.8});
+      sfx("triangle", 720, 0.5, 0.05, 900);
+      markSave();
+    }});
+  });
   /* むし */
   for(const b of bugs){
     const d = dist(player.x,player.y, b.x,b.y);
@@ -3177,10 +3217,22 @@ function checkGrowth(){
   markSave();
 }
 function startFarewell(){
-  farewell = { t: 0 };
-  dialog = null; fishing = null; race = null; ball.state = "none";
+  farewell = { t: 0, stage: 0 };
+  dialog = null; fishing = null; race = null; pachi = null; slot = null; derby = null; ball.state = "none";
   closePanels();
   sfx("triangle", 520, 0.7, 0.08, 240);
+}
+function farewellTap(){
+  if(!farewell || farewell.t < 1.4) return;   /* 誤タップぼうし */
+  farewell.stage++;
+  farewell.t = 0;
+  sfx("triangle", 460, 0.4, 0.06, 320);
+  if(farewell.stage >= 3){
+    memorials.push({ n: dName(), b: dogBreed, d: new Date().toISOString().slice(0,10) });
+    markSave();
+    newPuppy();
+    setTimeout(()=>{ popup = { text:"🌈 にじのはしパーク（湖の西の丘）にお墓ができた。ときどき、お参りしてあげてね", t:6 }; }, 5000);
+  }
 }
 function newPuppy(){
   farewell = null;
@@ -3221,8 +3273,7 @@ function update(dt){
 
   if(farewell){
     farewell.t += dt;
-    actPressed = false;
-    if(farewell.t > 7.5) newPuppy();
+    if(actPressed){ actPressed = false; farewellTap(); }
     return;
   }
   if(pachi){ updatePachi(dt); return; }
@@ -4267,6 +4318,24 @@ function drawWorld(){
       if(im) ctx.drawImage(im, Math.round(cx2*T - im.width/2), Math.round(by2*T - im.height));
     }});
   }
+  /* にじのはしパーク */
+  items.push({y:MEMORIAL.gate[1]*T, f:()=>{ const im=TOWN["memorial-gate"]; if(im) ctx.drawImage(im, Math.round(MEMORIAL.gate[0]*T-im.width/2), Math.round(MEMORIAL.gate[1]*T-im.height)); }});
+  items.push({y:(MEMORIAL.hall[1])*T, f:()=>{ const im=TOWN["ceremony-hall"]; if(im) ctx.drawImage(im, Math.round(MEMORIAL.hall[0]*T+24-im.width/2+24), Math.round(MEMORIAL.hall[1]*T-im.height)); }});
+  items.push({y:(MEMORIAL.tower[1])*T, f:()=>{ const im=TOWN["okuri-tower"]; if(im) ctx.drawImage(im, Math.round(MEMORIAL.tower[0]*T+12-im.width/2+12), Math.round(MEMORIAL.tower[1]*T-im.height)); }});
+  memorials.forEach((m,i)=>{
+    const [gx,gy] = graveXY(i);
+    items.push({y:gy*T, f:()=>{
+      const im = TOWN.ohaka, hn = TOWN["ohaka-hana"];
+      if(im){
+        ctx.drawImage(im, Math.round(gx*T-im.width/2), Math.round(gy*T-im.height));
+        if(hn) ctx.drawImage(hn, Math.round(gx*T-im.width/2-10), Math.round(gy*T-hn.height));
+        ctx.font = "bold 6px sans-serif"; ctx.textAlign = "center";
+        ctx.fillStyle = "#8a7a6a";
+        ctx.fillText(m.n, gx*T, gy*T-8);
+        ctx.textAlign = "left";
+      }
+    }});
+  });
   /* きらきらの まち：おいわいの かざりつけ */
   if(spiritTier()===3){
     const D = (n, cx, by, bob)=>{
@@ -4757,6 +4826,7 @@ function drawMinimap(wpx, hpx){
   uictx.fillText("🎭", mx+100*3*scl, my+67*3*scl);
   uictx.fillText("🎡", mx+114*3*scl, my+143*3*scl);
   uictx.fillText("🏮", mx+95*3*scl, my+50*3*scl);
+  uictx.fillText("🌈", mx+14*3*scl, my+114*3*scl);
   uictx.fillText("🎣", mx+40*3*scl, my+114*3*scl);
   uictx.fillText("🌸", mx+11*3*scl, my+145*3*scl);
   /* いまここ（点滅） */
@@ -4776,21 +4846,98 @@ function drawMinimap(wpx, hpx){
 }
 function drawFarewell(wpx, hpx){
   const sc = (wpx / VW) * 1.5;
-  uictx.fillStyle = "rgba(28,24,52,0.84)";
-  uictx.fillRect(0, 0, wpx, hpx);
-  const ic = ICONS.hane;
-  if(ic && ic.complete){
-    const s = 22*sc;
-    uictx.drawImage(ic, wpx/2 - s/2, hpx*0.28 - s/2 + Math.sin(time*1.5)*8, s, s);
-  }
+  const F = farewell;
+  uictx.imageSmoothingEnabled = false;
   uictx.textAlign = "center"; uictx.textBaseline = "middle";
-  uictx.font = `bold ${5.8*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
-  uictx.fillStyle = "#fff";
-  uictx.fillText(`${dName()}はお空のお散歩に出かけました…`, wpx/2, hpx*0.45, wpx*0.9);
-  uictx.font = `${4.4*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
-  uictx.fillStyle = "#e6dcf5";
-  uictx.fillText("たくさんの思い出をありがとう", wpx/2, hpx*0.52);
-  uictx.fillText("いつかきっと、また会えるよ", wpx/2, hpx*0.57);
+  const guide = ()=>{
+    if(F.t > 1.4 && Math.floor(time*1.4)%2===0){
+      uictx.font = `${3.6*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+      uictx.fillStyle = "rgba(255,255,255,0.75)";
+      uictx.fillText("タップですすむ", wpx/2, hpx*0.93);
+    }
+  };
+  if(F.stage === 0){
+    uictx.fillStyle = "rgba(28,24,52,0.86)";
+    uictx.fillRect(0, 0, wpx, hpx);
+    const ic = ICONS.hane;
+    if(ic && ic.complete){
+      const s = 22*sc;
+      uictx.drawImage(ic, wpx/2 - s/2, hpx*0.28 - s/2 + Math.sin(time*1.5)*8, s, s);
+    }
+    uictx.font = `bold ${5.8*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.fillStyle = "#fff";
+    uictx.fillText(`${dName()}はお空のお散歩に出かけました…`, wpx/2, hpx*0.45, wpx*0.9);
+    uictx.font = `${4.4*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.fillStyle = "#e6dcf5";
+    uictx.fillText("たくさんの思い出をありがとう", wpx/2, hpx*0.52);
+  }else if(F.stage === 1){
+    /* 虹の橋ホールでのお葬式 */
+    uictx.fillStyle = "#2e2848";
+    uictx.fillRect(0, 0, wpx, hpx);
+    const sd = TOWN.saidan;
+    if(sd) uictx.drawImage(sd, wpx/2 - sd.width*1.6*sc/2/1.5, hpx*0.30, sd.width*1.6*sc/1.5, sd.height*1.6*sc/1.5);
+    /* 遺影：フレームに いまの子の顔 */
+    const fr = OMIO_IMG["iei-frame"];
+    const dsh = dogSheet();
+    if(fr){
+      const fw = 15*sc, fh = fw*fr.height/fr.width;
+      uictx.drawImage(fr, wpx/2-fw/2, hpx*0.155, fw, fh);
+      if(dsh){
+        const df = dsh.down[0], dw = fw*0.55, dh = dw*df.h/df.w;
+        uictx.drawImage(df.c, wpx/2-dw/2, hpx*0.155+fh*0.24, dw, dh);
+      }
+    }
+    const ju = OMIO_IMG["juushoku-inu"];
+    if(ju){ const jw=13*sc; uictx.drawImage(ju, wpx*0.16, hpx*0.36, jw, jw*ju.height/ju.width); }
+    const cd = OMIO_IMG["candle"];
+    if(cd){ const cw=4.5*sc; uictx.drawImage(cd, wpx*0.30, hpx*0.33, cw, cw*cd.height/cd.width); uictx.drawImage(cd, wpx*0.66, hpx*0.33, cw, cw*cd.height/cd.width); }
+    /* 参列者：なかよしだった住民3人（喪章つき） */
+    const mourners = VILLAGERS.filter(v=>!v.tourist).sort((a,b)=>b.love-a.love).slice(0,3);
+    mourners.forEach((v,i)=>{
+      const sh = SPR[v.key];
+      const mx2 = wpx*0.35 + i*wpx*0.15, my2 = hpx*0.62;
+      if(sh){ const f=sh.down[0], w2=10*sc, h2=w2*f.h/f.w; uictx.drawImage(f.c, mx2-w2/2, my2-h2, w2, h2);
+        const rb = OMIO_IMG["mofuku-ribbon"];
+        if(rb){ const rw=3*sc; uictx.drawImage(rb, mx2-rw/2, my2-h2*0.45, rw, rw*rb.height/rb.width); } }
+    });
+    uictx.font = `bold ${5*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.fillStyle = "#fff";
+    uictx.fillText("🌈 虹の橋ホール", wpx/2, hpx*0.09);
+    uictx.font = `${4.2*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.fillStyle = "#e6dcf5";
+    uictx.fillText("みんなが おわかれに きてくれた", wpx/2, hpx*0.76);
+  }else{
+    /* 虹の橋をわたる */
+    const g = uictx.createLinearGradient(0,0,0,hpx);
+    g.addColorStop(0,"#8a7ec9"); g.addColorStop(0.6,"#c9b8e8"); g.addColorStop(1,"#ffe9f2");
+    uictx.fillStyle = g; uictx.fillRect(0,0,wpx,hpx);
+    const nh = OMIO_IMG["niji-hashi"];
+    if(nh){
+      const nw = wpx*0.94, nhh = nw*nh.height/nh.width;
+      uictx.drawImage(nh, wpx/2-nw/2, hpx*0.34, nw, nhh);
+      const tw2 = OMIO_IMG["tenshi-wanko"];
+      if(tw2){
+        const p = Math.min(1, F.t/7);
+        const tx2 = wpx*0.18 + p*wpx*0.6;
+        const ty2 = hpx*0.34 + nhh*0.42 - Math.sin(p*Math.PI)*nhh*0.28;
+        const w2 = 11*sc;
+        uictx.drawImage(tw2, tx2-w2/2, ty2-w2, w2, w2*tw2.height/tw2.width);
+      }
+    }
+    const hk = OMIO_IMG["hoshi-kira"];
+    if(hk) for(let i=0;i<5;i++){
+      const sy2 = hpx*0.8 - ((time*24 + i*97) % (hpx*0.6));
+      uictx.globalAlpha = 0.7;
+      uictx.drawImage(hk, wpx*(0.15+i*0.17), sy2, 5*sc, 5*sc*hk.height/hk.width);
+      uictx.globalAlpha = 1;
+    }
+    uictx.font = `bold ${5*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.fillStyle = "#5a4a7a";
+    uictx.fillText(`${dName()}は 虹の橋を わたっていく`, wpx/2, hpx*0.16);
+    uictx.font = `${4.2*sc}px 'Hiragino Maru Gothic ProN', sans-serif`;
+    uictx.fillText("ありがとう。いつかまた、いっしょにお散歩しよう", wpx/2, hpx*0.22);
+  }
+  guide();
   uictx.textAlign = "left";
 }
 function bubble(sx, sy, text, sc, soft){
@@ -4914,6 +5061,12 @@ if(lastAbsenceH >= 6 && playerName){
 if(pendingFarewell){
   pendingFarewell = false;
   setTimeout(()=>{ if(!farewell) startFarewell(); }, 4500);
+}else if(pendingWarn){
+  pendingWarn = false;
+  setTimeout(()=>{
+    popup = { text:`⚠ ${dName()}はもう${Math.floor(lastAbsenceH/24)}日ひとりぼっち…このままだと、ほんとうにお別れになっちゃう！`, t:6 };
+    sfx("sine", 300, 0.6, 0.1, 150);
+  }, 5000);
 }
 let last = performance.now();
 function loop(now){
@@ -4954,6 +5107,7 @@ window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundIte
   openCasino, startSlot, slotTap, getSlot:()=>slot, startHilo, hiloGuess, startDerby, derbyTap, getDerby:()=>derby,
   openScam, forceScam:(k)=>{ const v=VILLAGERS.find(v=>v.key===k); if(v) v.chase=true; },
   getScamLoss:()=>scamLoss, openJobBoard, getJob:()=>job,
+  memorials, farewellTap,
   get careScore(){ return careScore; },
   get rankInfo(){ return rankInfo; },
   toggleMap:()=>{ mapOpen = !mapOpen; },
