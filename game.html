@@ -297,11 +297,11 @@
 "use strict";
 /* ================= 基本セットアップ ================= */
 /* ================= バージョン（更新のたびに上げる＋内容を書く） ================= */
-const GAME_VER = "1.10.0";
+const GAME_VER = "1.10.1";
 const UPDATE_NOTES = [
   "🏮 川の向こうに「うらまち」誕生！ 橋をわたって東へ",
-  "🎭 わん座（歌舞伎）・♨旅館の湯・🎡わんダーランド・📋おしごと掲示板",
-  "🐍 あやしい住民に注意！ 勧誘は…断る勇気。こまったら交番の銀次へ"
+  "🦊 勧誘に“本物のお得”がまざるように。話し方をよく見て見抜こう",
+  "💰 「袋を運ぶだけ」の甘いおしごとは受け子のワナ…！ 銀次は見ている"
 ];
 const T = 24, MW = 136, MH = 192;    /* 大きな街＋東の川向こうに「うらまち」地区 */
 let VW = 320, VH = 240;
@@ -2968,64 +2968,115 @@ const URA_SPOTS = [
   {x:90,   y:145,  r:50, label:"🎠 メリーゴーランド（150ベル）", f:()=>ride(150, 4, "🎠 犬の木馬でくるくる♪")},
   {x:122,  y:145,  r:54, label:"👻 お化け屋敷（250ベル）", f:()=>ride(250, 6, "👻 こわかわいい おばけがいっぱいだった…")}
 ];
-/* --- 勧誘イベント --- */
-let scamV = null;
+/* --- 勧誘イベント：ぜんぶが詐欺とはかぎらない。見抜けるか？ --- */
+let scamV = null, scamOffer = null;
 function openScam(v){
   uiOpen();
   scamV = v;
   const sp = document.getElementById("scamPanel");
   let body = "";
-  if(v.key==="kitsune-shoji") body = `
-    <div>「ここだけの話…この<b>必勝DVD</b>、見るだけでベルがザックザク！ いまなら<b>たったの3000ベル</b>！」</div>
-    <div class="row"><button data-scam="dvd" ${bells>=3000?"":"disabled"} style="flex:1;">買う（3000ベル）</button></div>`;
-  if(v.key==="hebi-mulch") body = `
-    <div>「<b>会員になるだけ</b>で、友だちを紹介するたびもうかるの♪ 入会金は<b>2000ベル</b>だけ〜」</div>
-    <div class="row"><button data-scam="mulch" ${bells>=2000?"":"disabled"} style="flex:1;">入会する（2000ベル）</button></div>`;
-  if(v.key==="nezumi-joho") body = `
-    <div>「…とっておきの<b>たから情報</b>、あるよ。<b>500ベル</b>でどう？」</div>
-    <div class="row"><button data-scam="joho" ${bells>=500?"":"disabled"} style="flex:1;">買う（500ベル）</button></div>`;
-  if(v.key==="itachi-uranai") body = `
-    <div>「ふふ…あなたの明日、<b>水晶玉</b>にうつってるわ。<b>500ベル</b>で見せてあげる」</div>
-    <div class="row"><button data-scam="uranai" ${bells>=500?"":"disabled"} style="flex:1;">占ってもらう（500ベル）</button></div>`;
+  /* その場で「今回の中身」を決める（詐欺か、本物か） */
+  if(v.key==="kitsune-shoji"){
+    if(Math.random() < 0.3){
+      /* 本物：しゃべり方がおだやかで、理由が具体的 */
+      scamOffer = { type:"food-deal", genuine:true, cost:200 };
+      body = `
+        <div>「仕入れすぎちゃってね。<b>ドッグフード10食</b>、うちで買うより安い<b>200ベル</b>でどうだい。相場は300だから、ふつうにお得だよ」</div>
+        <div class="row"><button data-scam="go" ${bells>=200?"":"disabled"} style="flex:1;">買う（200ベル）</button></div>`;
+    }else{
+      scamOffer = { type:"dvd", genuine:false, cost:3000 };
+      body = `
+        <div>「ここだけの話…この<b>必勝DVD</b>、見る<b>だけ</b>でベルがザックザク！ <b>絶対</b>もうかる！ <b>いまなら</b>たったの3000ベル！」</div>
+        <div class="row"><button data-scam="go" ${bells>=3000?"":"disabled"} style="flex:1;">買う（3000ベル）</button></div>`;
+    }
+  }else if(v.key==="hebi-mulch"){
+    scamOffer = { type:"mulch", genuine:false, cost:2000 };
+    body = `
+      <div>「<b>会員になるだけ</b>で、友だちを紹介するたび<b>ぜったい</b>もうかるの♪ 入会金は<b>2000ベル</b>だけ〜」</div>
+      <div class="row"><button data-scam="go" ${bells>=2000?"":"disabled"} style="flex:1;">入会する（2000ベル）</button></div>`;
+  }else if(v.key==="nezumi-joho"){
+    if(Math.random() < 0.35){
+      scamOffer = { type:"ukeko", genuine:false, cost:0 };
+      body = `
+        <div>「かんたんな<b>おしごと</b>だよ。この<b>袋</b>を九兵衛の旦那にとどける<b>だけ</b>で<b>1000ベル</b>。…<b>だれにも言うなよ</b>」</div>
+        <div class="row"><button data-scam="go" style="flex:1;">はこぶ（+1000ベル？）</button></div>`;
+    }else{
+      scamOffer = { type:"joho", genuine:null, cost:500 };
+      body = `
+        <div>「…とっておきの<b>たから情報</b>、あるよ。<b>500ベル</b>でどう？ 当たるも八卦だけどね」</div>
+        <div class="row"><button data-scam="go" ${bells>=500?"":"disabled"} style="flex:1;">買う（500ベル）</button></div>`;
+    }
+  }else if(v.key==="itachi-uranai"){
+    scamOffer = { type:"uranai", genuine:null, cost:500 };
+    body = `
+      <div>「ふふ…あなたの明日、<b>水晶玉</b>にうつってるわ。<b>500ベル</b>で見せてあげる」</div>
+      <div class="row"><button data-scam="go" ${bells>=500?"":"disabled"} style="flex:1;">占ってもらう（500ベル）</button></div>`;
+  }
   sp.innerHTML = `<h2>${v.name}が近づいてきた…</h2>` + body +
     `<div class="row"><button data-scam="refuse" style="flex:1; background:#8a9a8a;">きっぱり断る</button></div>`;
   sp.style.display = "block";
 }
 document.getElementById("scamPanel").addEventListener("click", e=>{
   const k = e.target.dataset.scam;
-  if(!k) return;
+  if(!k || !scamOffer) return;
   const sp = document.getElementById("scamPanel");
   sp.style.display = "none"; uiClose();
+  const o = scamOffer;
   if(k==="refuse"){
-    addCare(5);
-    popup = { text:"👀 あやしさを見抜いた！ えらい！（お世話指数+5）", t:3.4 };
-    jingle();
-  }else if(k==="dvd" && pay(3000)){
-    scamLoss += 3000;
-    popup = { text:"📀 家で見たら『毎日お散歩しよう』とだけ映っていた…（-3000ベル）こまったら交番の銀次へ", t:4.6 };
-    noiseSfx(0.2, 0.06, 500, 150);
-  }else if(k==="mulch" && pay(2000)){
-    scamLoss += 2000;
-    for(const v2 of VILLAGERS) if(!v2.tourist && !SCAMMERS[v2.key]) v2.love = Math.max(0, v2.love - 0.5);
-    popup = { text:"🐍 会員になった…でも紹介できる友だちはいない。町のみんなが少しよそよそしい（-2000ベル）", t:4.6 };
-    noiseSfx(0.2, 0.06, 500, 150);
-  }else if(k==="joho" && pay(500)){
-    if(Math.random() < 0.5){
-      digSpots.push({tx: clamp(Math.floor(player.x/T)+2, 2, MW-3), ty: clamp(Math.floor(player.y/T)+1, 2, MH-3)});
-      popup = { text:"🐭 情報は本物だった！ 近くがキラキラしてる…ほってみよう！", t:4 };
-      jingle();
+    if(o.genuine === true){
+      popup = { text:"…ていねいに断った。（あれ、いま思うと本物のお得だったかも…？）", t:3.8 };
+    }else if(o.type === "ukeko"){
+      addCare(8); jingle();
+      popup = { text:"👀『だれにも言うな』は受け子のワナ！ よく見抜いた！（お世話指数+8）", t:4.2 };
+    }else if(o.genuine === false){
+      addCare(5); jingle();
+      popup = { text:"👀 あやしさを見抜いた！ えらい！（お世話指数+5）", t:3.4 };
     }else{
-      scamLoss += 500;
-      popup = { text:"🐭『情報は生ものだからね』…なにも見つからなかった（-500ベル）", t:4 };
+      popup = { text:"断った。…本物だったのか、ワナだったのか。それはわからない。", t:3.4 };
     }
-  }else if(k==="uranai" && pay(500)){
-    const r = Math.random();
-    if(r < 0.3){ addCare(5); popup = { text:"🔮「大吉よ！」なんだか元気が出た（お世話指数+5）", t:3.6 }; jingle(); }
-    else if(r < 0.6) popup = { text:"🔮「中吉。犬にやさしくすると吉」…いつもやってるが？", t:3.6 };
-    else popup = { text:"🔮「凶。今夜のラーメン屋台に気をつけて」…どういうこと？", t:3.6 };
+  }else if(k==="go"){
+    if(o.type==="food-deal" && pay(200)){
+      foodStock += 10; updateFeedBtn();
+      popup = { text:"🥫 ほんとうにお買い得だった！ ドッグフード+10食（コンさん、たまにいい人）", t:4 };
+      jingle();
+    }else if(o.type==="dvd" && pay(3000)){
+      scamLoss += 3000;
+      popup = { text:"📀 家で見たら『毎日お散歩しよう』とだけ映っていた…（-3000ベル）こまったら交番の銀次へ", t:4.6 };
+      noiseSfx(0.2, 0.06, 500, 150);
+    }else if(o.type==="mulch" && pay(2000)){
+      scamLoss += 2000;
+      for(const v2 of VILLAGERS) if(!v2.tourist && !SCAMMERS[v2.key]) v2.love = Math.max(0, v2.love - 0.5);
+      popup = { text:"🐍 会員になった…でも紹介できる友だちはいない。町のみんなが少しよそよそしい（-2000ベル）", t:4.6 };
+      noiseSfx(0.2, 0.06, 500, 150);
+    }else if(o.type==="ukeko"){
+      /* 受け子は、必ず捕まる */
+      popup = { text:"💰 袋をかかえて歩きだした…", t:1.6 };
+      setTimeout(()=>{
+        const fine = Math.min(500, bells);
+        bells -= fine;
+        careScore = Math.max(0, careScore - 8); netDirty = true;
+        popup = { text:`🚨 銀次「待ちな！ それは“受け子”ってやつだ。知らなかったは通らねえ…初犯だ、罰金${fine}ベルですませてやる」（指数-8）`, t:6 };
+        noiseSfx(0.25, 0.08, 700, 200);
+        markSave();
+      }, 1800);
+    }else if(o.type==="joho" && pay(500)){
+      if(Math.random() < 0.5){
+        digSpots.push({tx: clamp(Math.floor(player.x/T)+2, 2, MW-3), ty: clamp(Math.floor(player.y/T)+1, 2, MH-3)});
+        popup = { text:"🐭 情報は本物だった！ 近くがキラキラしてる…ほってみよう！", t:4 };
+        jingle();
+      }else{
+        scamLoss += 500;
+        popup = { text:"🐭『情報は生ものだからね』…なにも見つからなかった（-500ベル）", t:4 };
+      }
+    }else if(o.type==="uranai" && pay(500)){
+      const r = Math.random();
+      if(r < 0.3){ addCare(5); popup = { text:"🔮「大吉よ！」なんだか元気が出た（お世話指数+5）", t:3.6 }; jingle(); }
+      else if(r < 0.6) popup = { text:"🔮「中吉。犬にやさしくすると吉」…いつもやってるが？", t:3.6 };
+      else popup = { text:"🔮「凶。今夜のラーメン屋台に気をつけて」…どういうこと？", t:3.6 };
+    }
   }
   markSave();
-  scamV = null;
+  scamV = null; scamOffer = null;
 });
 const feedBtn = document.getElementById("feedBtn");
 function updateFeedBtn(){ feedBtn.style.display = foodStock>0 ? "flex" : "none"; }
