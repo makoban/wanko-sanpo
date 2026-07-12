@@ -297,11 +297,11 @@
 "use strict";
 /* ================= 基本セットアップ ================= */
 /* ================= バージョン（更新のたびに上げる＋内容を書く） ================= */
-const GAME_VER = "1.13.1";
+const GAME_VER = "1.14.0";
 const UPDATE_NOTES = [
-  "📍 みちあんない機能！ 🗺地図で行きたい場所のマークをタップすると、",
-  "　 ピンクの矢印が目的地までずっと案内してくれるよ（とうちゃくで解除）",
-  "🏔 わんこ富士・📈わん株・🏠マイホーム・🎭演目も好評開催中"
+  "🦴 わん座どおりの南に「ほねずみ横丁」…野良わんこにごはんを分けると横丁が復興していく",
+  "⚓ すなはまの渡し舟で「しおかぜ湊」へ！ 魚市場は日がわり相場（最大×2.0）",
+  "🗣 住民があなたの“うわさ話”をするように。天気や犬種の話題も"
 ];
 const T = 24, MW = 136, MH = 192;    /* 大きな街＋東の川向こうに「うらまち」地区 */
 let VW = 320, VH = 240;
@@ -661,7 +661,11 @@ const TOWN = {};
  /* v12：わんこ富士・わん株・演目（v10地形も） */
  "gake-face","gake-top","tsuribashi","cave-in","sancho-torii","yukiyama","watashibune","hashi-tate",
  "tozan-guchi","yama-goya","onsen-tamago","ropeway","kumo-umi","sancho-hokora","yuki-patch",
- "kabu-kaikan","fudosan","myhome-s","myhome-m","myhome-l","kabuki-bg"].forEach(n=>{
+ "kabu-kaikan","fudosan","myhome-s","myhome-m","myhome-l","kabuki-bg",
+ /* v13：スラムと港町 */
+ "barrack-a","barrack-b","danboru-house","drum-fire","monohoshi","ware-lamp","takidashi",
+ "boro-hashi","guard-arch","slum-flower","nagaya","fukkou-hata",
+ "todai","ooki-sanbashi","gyosen","ichiba-stand","himono-noren","ikari","taru-minato","ami"].forEach(n=>{
   const im = new Image();
   im.onload = ()=>{ TOWN[n] = im; };
   im.src = "sprites/town/" + n + ".png";
@@ -730,6 +734,7 @@ const POOPIMG = new Image(); POOPIMG.src = "sprites/items/care/poop.png";
 const SHEET_NAMES = ["girl","dog","moka","mike","kerota","penta","tonko","meeko","mimii","noron",
   /* v10 うらまちの住民 */
   "kitsune-shoji","hebi-mulch","tanuki-fudosan","karasu-shichiya","itachi-uranai","buta-shacho","nezumi-joho","ookami-yojinbo",
+  "nora-shiro","nora-buchi","nora-kuro","gensan","sencho",
   /* v6 新住民30体 */
   "konta","ponkichi","ririsu","paopao","koaran","hamujiro","harry","ho-chan","ga-ko","meemee",
   "mo-san","poniko","chuta","mogurin","kawacchi","flamie","kumagoro","pakarun","rakkosuke","kamekichi",
@@ -1006,6 +1011,7 @@ function doSave(){
       bells, hasBall, bandana, petCount, playerName, dogName, raceWins, dogBreed,
       accessory, fashionOwned, furnInv, placedFurn, memorials,
       lastBlessDay, toucho, homeLevel, loanLeft, lastLoanDay, kabuP, kabuH, lastKabuDay, kabukiBuff,
+      noraFed, rumors,
       foodStock, medCount, care, poops, savedAt: Date.now(),
       careScore, playerId, lastPlayDay, spirit, tut: tutStep, promised, lastSeenVer, scamLoss,
       apple:pocket.apple, fossil:pocket.fossil,
@@ -1033,6 +1039,7 @@ function loadSave(){
     homeLevel = d.homeLevel || 0; loanLeft = d.loanLeft || 0; lastLoanDay = d.lastLoanDay || "";
     Object.assign(kabuP, d.kabuP || {}); Object.assign(kabuH, d.kabuH || {});
     lastKabuDay = d.lastKabuDay || ""; kabukiBuff = d.kabukiBuff || null;
+    Object.assign(noraFed, d.noraFed || {}); Object.assign(rumors, d.rumors || {});
     if(homeLevel > 0) setHomeSolid();
     careScore = d.careScore||0; playerId = d.playerId||""; lastPlayDay = d.lastPlayDay||"";
     if(d.spirit != null) spirit = clamp(d.spirit, 0, 100);
@@ -1232,6 +1239,11 @@ const FUJI_DECO = [   /* [画像, 中心x, 足元y, solid?] */
   ["yuki-patch",   34, 3.5], ["yuki-patch", 46, 3.2], ["yuki-patch", 42, 6.5]
 ];
 for(const d of FUJI_DECO) if(d[3]) solid[Math.floor(d[2])][Math.floor(d[1])]=true;
+/* ほねずみ横丁（v13・わん座どおりの南のスラム）としおかぜ湊（東のはま） */
+const SLUM_SOLIDS = [[116,94,2,2],[126,96,2,2],[120,99,1,1],[119,104,1,1],[124,103,1,1],[116,101,1,1]];
+for(const [sx,sy,sw,sh] of SLUM_SOLIDS) for(let y=sy;y<sy+sh;y++) for(let x=sx;x<sx+sw;x++) solid[y][x]=true;
+solid[157][130]=true; solid[157][131]=true;   /* 灯台 */
+solid[158][114]=true; solid[158][115]=true;   /* 市場 */
 /* にじのはしパーク（v11・湖の西のしずかな丘） */
 const MEMORIAL = { gate:[14.5,111.8], hall:[8.5,116], tower:[18,116] };
 for(let y=114;y<116;y++) for(let x=7;x<11;x++) solid[y][x]=true;    /* ホール */
@@ -1393,6 +1405,19 @@ const URA_RESIDENTS = [
  ["buta-shacho","トン重役","#e88ba8", 118.5,58.5, 280,["わが社は急成長中でねえ、ブヒ","きみ、うちで働かないかね？","時は金なり、金は金なりブヒ"]],
  ["ookami-yojinbo","銀次","#7a8a9a", 110.5,54.8, 320,["…この町にも、わるいやつはいる","こまったら交番に来な","うまい話ほど、よくかみつけ"]]
 ];
+/* v13：ほねずみ横丁と しおかぜ湊の住民 */
+const V13_RESIDENTS = [
+ ["nora-shiro","シロツメ","#e8e0d0", 117.5,97.5, 640,["…おなか、すいたな","（じっと こちらを見ている）","ごはん、くれるの…？"]],
+ ["nora-buchi","ブチ丸","#c98b4e", 127.5,99.5, 760,["わん！ あそんでくれるの！？","ぼく、げんきだけがとりえなんだ","いつか首輪、ほしいなあ"]],
+ ["nora-kuro","クロスケ","#5a5a6a", 121.5,106.5, 420,["…ちかよらないほうがいい。ノミがうつる","（そっぽを向いた）","…きみの犬、しあわせそうだな"]],
+ ["gensan","ゲンさん","#8a7a6a", 118.2,105.5, 300,["ようこそ、ほねずみ横丁へ。なにもないが、火はあったかい","あの子らに、めしを分けてやってくれんか","わしらは忘れられた犬さ。だが、生きとるよ"]],
+ ["sencho","シーマン船長","#4a6a8a", 120.5,158.5, 340,["ヨーソロー！ しおかぜ湊へようこそだ","海の男はな、しっぽで嘘をつかん","市場の魚は日によって値がちがうぞ。高い日をねらいな"]]
+];
+for(const [key,name,tag,tx,ty,pitch,lines] of V13_RESIDENTS){
+  VILLAGERS.push({ name, key, tag, pitch, lines,
+    img: makeVillager(HEAD_BEAR, {s:"#c9a67a", m:"#e8d4b0", T:"#9a8a7a", t:"#c4b4a4"}),
+    hx:tx*T, hy:ty*T });
+}
 for(const [key,name,tag,tx,ty,pitch,lines] of URA_RESIDENTS){
   VILLAGERS.push({ name, key, tag, pitch, lines,
     img: makeVillager(HEAD_BEAR, {s:"#c9a67a", m:"#e8d4b0", T:"#8a8a9a", t:"#b3b3c4"}),
@@ -1658,6 +1683,18 @@ function startDialog(v){
   tutDone(3);
   /* 勧誘員に自分から話しかけても勧誘される */
   if(SCAMMERS[v.key]){ openScam(v); return; }
+  /* 野良わんこには ごはんを分けてあげられる */
+  if(NORA[v.key]){ feedNora(v); return; }
+  /* ゲンさんは復興ガイド */
+  if(v.key === "gensan"){
+    const st = slumStage();
+    const gl = st===0 ? `あの子らに、めしを分けてやってくれんか。（復興 ${fukkoudo()}/9）`
+             : st===1 ? `…横丁に、すこし光がもどってきた。あんたのおかげだ。（復興 ${fukkoudo()}/9）`
+             : "見てくれ、この長屋を。わしらはもう、忘れられた犬じゃない。…ありがとうな";
+    dialog = { v, text: gl, chars:0 };
+    v.state = "idle"; v.wt = 2.5; uiOpen();
+    return;
+  }
   /* おしごと：小包のおとどけ完了 */
   if(job && job.to === v.key){
     bells += job.reward; addCare(6); coinSfx();
@@ -1720,8 +1757,23 @@ function startDialog(v){
         "今日もきらきらの一日だね！","お客さままで遊びに来てるよ！ すごいね！"];
       text = warm[Math.floor(Math.random()*warm.length)];
     }else{
-      text = v.lines[v.lineI % v.lines.length];
-      v.lineI++;
+      /* うわさ話と文脈セリフ（35%） */
+      const pool = [];
+      if(rumors.casino) pool.push("カジノで大勝ちしたってうわさ、ほんとなの！？");
+      if(rumors.ukeko) pool.push("…受け子でつかまりかけたって聞いたよ。うまい話はダメだよ？");
+      if(rumors.fukkou) pool.push("ほねずみ横丁、見ちがえたね！ あなたがやったんだって？");
+      if(weather==="ame") pool.push("雨の日のお散歩もいいけど、帰ったら足ふいてあげてね");
+      if(weather==="yuki") pool.push("ゆき〜！ 犬はよろこび庭かけまわる〜♪");
+      if(weather==="kiri") pool.push("霧がふかいね。はぐれないようにね");
+      if(dayPhase().isNight) pool.push("夜のお散歩、星がきれいだね");
+      if(dogBreed !== "shiba") pool.push(`${breedLabel()}っていいよね。うしろすがたがもう、たまらない`);
+      if(homeLevel > 0) pool.push("マイホーム買ったんだって？ おとなだね〜");
+      if(pool.length && Math.random() < 0.35){
+        text = pool[Math.floor(Math.random()*pool.length)];
+      }else{
+        text = v.lines[v.lineI % v.lines.length];
+        v.lineI++;
+      }
     }
     if(time - v.lastTalk > 30){ v.love = Math.min(5, v.love + (kabukiBuffOn("love") ? 0.7 : 0.34)); v.lastTalk = time; markSave(); }
   }
@@ -2729,7 +2781,7 @@ function slotTap(){
       }else if(sevens === 2){ won = SLOT_TWO7; msg = "7がふたつ！ おしい！"; }
       else if(syms[0]===syms[1] || syms[1]===syms[2] || syms[0]===syms[2]){ won = SLOT_PAIR; msg = "ペア！"; }
       if(won > 0){ bells += won; coinSfx(); }
-      if(won >= 800){ fanfare(); slot.flash = 1.6; }
+      if(won >= 800){ fanfare(); slot.flash = 1.6; rumors.casino = true; }
       slot.won = won; slot.msg = msg;
       slot.state = "result";
       markSave();
@@ -3152,6 +3204,7 @@ document.getElementById("scamPanel").addEventListener("click", e=>{
         const fine = Math.min(500, bells);
         bells -= fine;
         careScore = Math.max(0, careScore - 8); netDirty = true;
+        rumors.ukeko = true;
         popup = { text:`🚨 銀次「待ちな！ それは“受け子”ってやつだ。知らなかったは通らねえ…初犯だ、罰金${fine}ベルですませてやる」（指数-8）`, t:6 };
         noiseSfx(0.25, 0.08, 700, 200);
         markSave();
@@ -3274,6 +3327,65 @@ function openEngi(){
   popup = { text:`🎭 本日の演目「${name}」！ 大当たりの舞台だった。${desc}（指数+8）`, t:5.5 };
   markSave();
 }
+/* ================= ほねずみ横丁の復興・しおかぜ湊（v13） ================= */
+const NORA = {"nora-shiro":1, "nora-buchi":1, "nora-kuro":1};
+const noraFed = {};
+const rumors = {};
+const fukkoudo = ()=> Object.values(noraFed).reduce((a,b)=>a+Math.min(3,b), 0);   /* 0〜9 */
+const slumStage = ()=> fukkoudo() < 3 ? 0 : fukkoudo() < 7 ? 1 : 2;
+function feedNora(v){
+  if(foodStock <= 0){
+    dialog = { v, text:"（おなかをすかせている…ドッグフードを持ってきてあげよう）", chars:0 };
+    uiOpen(); return;
+  }
+  const before = slumStage();
+  foodStock--; updateFeedBtn();
+  noraFed[v.key] = (noraFed[v.key]||0) + 1;
+  addCare(4);
+  for(let i=0;i<3;i++) hearts.push({x:v.x+(Math.random()*20-10), y:v.y-16-i*4, vy:-(20+Math.random()*10), life:1.3});
+  jingle();
+  const n = Math.min(3, noraFed[v.key]);
+  const msgs = ["（おそるおそる…たべた。すこし目があった）","（しっぽが ゆれている！）","（すっかりなついた！ もう家族みたいだ）"];
+  dialog = { v, text:`ごはんを分けてあげた。${msgs[n-1]}（横丁の復興 ${fukkoudo()}/9）`, chars:0 };
+  uiOpen();
+  if(before < 2 && slumStage() === 2){
+    rumors.fukkou = true;
+    setTimeout(()=>{
+      fanfare();
+      popup = { text:"🌸 ほねずみ横丁が生まれ変わった！！ ボロ小屋はきれいな長屋に。ゲンさん「…ありがとうな」", t:7 };
+      addCare(30);
+    }, 1500);
+  }
+  markSave();
+}
+/* しおかぜ湊の市場（相場は日がわり） */
+function marketMult(){
+  return 1 + (hashStr(new Date().toISOString().slice(0,10)+"m") % 11) / 10;   /* ×1.0〜2.0 */
+}
+function openMarket(){
+  const m = marketMult();
+  const total = Math.floor(ALL_FISH.reduce((a,f)=>a+(fishInv[f.name]||0)*f.price, 0) * m);
+  const cnt = sumInv(fishInv);
+  if(cnt === 0){ popup = { text:`⚓ 今日の相場は×${m.toFixed(1)}。魚を持っておいで！${m>=1.6?" 今日は高値だぞ！":""}`, t:4 }; return; }
+  bells += total;
+  for(const f of ALL_FISH) fishInv[f.name] = 0;
+  coinSfx(); markSave();
+  popup = { text:`⚓ 相場×${m.toFixed(1)}で魚${cnt}匹を${total}ベルで売った！${m>=1.6?" 大漁日和！":""}`, t:4.6 };
+}
+/* 渡し舟 */
+function ferry(toMinato){
+  splash();
+  player.x = (toMinato ? 116 : 52)*T; player.y = 161*T;
+  dog.x = player.x - 20; dog.y = player.y;
+  popup = { text: toMinato ? "⛵ しおかぜ湊に とうちゃく！ 潮のかおりがする" : "⛵ すなはまに もどってきた", t:3.2 };
+  addCare(1); markSave();
+}
+URA_SPOTS.push(
+  {x:48,  y:161.5, r:44, label:"⛵ 渡し舟（しおかぜ湊へ）", f:()=>ferry(true)},
+  {x:112, y:161.5, r:44, label:"⛵ 渡し舟（すなはまへ）", f:()=>ferry(false)},
+  {x:115, y:159.5, r:46, label:"🐟 魚市場（今日の相場で売る）", f:openMarket},
+  {x:119, y:105,   r:40, label:"🔥 たき火（あたたまる）", f:()=>{ dog.happyT=3; addCare(1); popup={text:"🔥 たき火であたたまった。ゲンさん「ゆっくりしてきな」",t:3}; }}
+);
 /* 山と株と家のスポットを追加 */
 URA_SPOTS.push(
   {x:31,   y:15,  r:52, label:"🏔 山小屋（ひとやすみ）", f:()=>{ addCare(2); dog.happyT=3; care.hunger=Math.min(100,care.hunger+5); popup={text:"🏔 山小屋でひとやすみ。ストーブがあったかい…（指数+2）",t:3.2}; }},
@@ -4496,6 +4608,37 @@ function drawWorld(){
       if(im) ctx.drawImage(im, Math.round(cx2*T - im.width/2), Math.round(by2*T - im.height));
     }});
   }
+  /* ほねずみ横丁（復興ステージで見た目がかわる） */
+  {
+    const st = slumStage();
+    const deco = [
+      ["guard-arch", 114, 91.8],
+      st===2 ? ["nagaya", 121, 97.2] : ["barrack-a", 117, 96.2],
+      st===2 ? null : ["barrack-b", 127, 98.2],
+      st===2 ? ["fukkou-hata", 115, 99.5] : ["danboru-house", 120, 100.2],
+      ["drum-fire", 119.5, 105.2],
+      st===0 ? ["ware-lamp", 124.5, 104.2] : ["monohoshi", 123, 96.5],
+      st>=1 ? ["takidashi", 116.5, 102.2] : null,
+      st>=1 ? ["slum-flower", 118, 98.5] : null,
+      st===2 ? ["slum-flower", 125, 105.5] : null,
+      ["boro-hashi", 128, 107.5]
+    ].filter(Boolean);
+    for(const [n,cx2,by2] of deco){
+      items.push({y:by2*T, f:()=>{
+        const im = TOWN[n];
+        if(im) ctx.drawImage(im, Math.round(cx2*T - im.width/2), Math.round(by2*T - im.height));
+      }});
+    }
+  }
+  /* しおかぜ湊 */
+  for(const [n,cx2,by2] of [["todai",131,158.5],["himono-noren",110,157.5],["ichiba-stand",115,159.5],
+      ["ikari",118,160.5],["taru-minato",112,161],["ami",133,161.5],
+      ["ooki-sanbashi",121,167.5],["gyosen",127,169.5],["watashibune",112,163],["watashibune",48,163]]){
+    items.push({y:by2*T, f:()=>{
+      const im = TOWN[n];
+      if(im) ctx.drawImage(im, Math.round(cx2*T - im.width/2), Math.round(by2*T - im.height));
+    }});
+  }
   /* わんこ富士 */
   for(const [n,cx2,by2] of FUJI_DECO){
     items.push({y:by2*T, f:()=>{
@@ -5117,6 +5260,8 @@ function drawMinimap(wpx, hpx){
   uictx.fillText("🏮", mx+95*3*scl, my+50*3*scl);
   uictx.fillText("🌈", mx+14*3*scl, my+114*3*scl);
   uictx.fillText("⛩", mx+40*3*scl, my+5*3*scl);
+  uictx.fillText("🦴", mx+121*3*scl, my+100*3*scl);
+  uictx.fillText("⚓", mx+122*3*scl, my+159*3*scl);
   uictx.fillText("☕", mx+64*3*scl, my+56*3*scl);
   uictx.fillText("📋", mx+88*3*scl, my+45*3*scl);
   /* あんない中の目的地はリングで強調 */
@@ -5419,6 +5564,7 @@ window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundIte
   memorials, farewellTap,
   blessInugami, openKabu, openFudosan, openEngi, getHome:()=>({homeLevel, loanLeft}), kabuP, kabuH,
   setNav:(label,x,y)=>{ navTarget = {label,x,y}; }, getNav:()=>navTarget, NAV_SPOTS, mapTapNav,
+  feedNora, noraFed, rumors, slumStage, fukkoudo, openMarket, ferry,
   get careScore(){ return careScore; },
   get rankInfo(){ return rankInfo; },
   toggleMap:()=>{ mapOpen = !mapOpen; },
