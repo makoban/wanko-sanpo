@@ -297,11 +297,12 @@
 "use strict";
 /* ================= 基本セットアップ ================= */
 /* ================= バージョン（更新のたびに上げる＋内容を書く） ================= */
-const GAME_VER = "1.14.0";
+const GAME_VER = "1.15.0";
 const UPDATE_NOTES = [
-  "🦴 わん座どおりの南に「ほねずみ横丁」…野良わんこにごはんを分けると横丁が復興していく",
-  "⚓ すなはまの渡し舟で「しおかぜ湊」へ！ 魚市場は日がわり相場（最大×2.0）",
-  "🗣 住民があなたの“うわさ話”をするように。天気や犬種の話題も"
+  "🚓 西どおりに「警察署」！ おまわりケンと刑事トラ次郎が町にやってきた",
+  "🚬 うらまちに あやしい売人「ドク」が…買うと大失敗、📞110番通報すると大手がら！",
+  "🦸 新しい「ヒーロー度」…わるい誘いを断ったり通報すると上がるよ（ずかんで見られる）",
+  "🏥 「わんこ総合病院」オープン（200ベルで病気も おなかも 全回復）＋🏫 小学校"
 ];
 const T = 24, MW = 136, MH = 192;    /* 大きな街＋東の川向こうに「うらまち」地区 */
 let VW = 320, VH = 240;
@@ -665,7 +666,9 @@ const TOWN = {};
  /* v13：スラムと港町 */
  "barrack-a","barrack-b","danboru-house","drum-fire","monohoshi","ware-lamp","takidashi",
  "boro-hashi","guard-arch","slum-flower","nagaya","fukkou-hata",
- "todai","ooki-sanbashi","gyosen","ichiba-stand","himono-noren","ikari","taru-minato","ami"].forEach(n=>{
+ "todai","ooki-sanbashi","gyosen","ichiba-stand","himono-noren","ikari","taru-minato","ami",
+ /* v14：まちの善と悪 */
+ "police-hq","hospital","school","patrol-car"].forEach(n=>{
   const im = new Image();
   im.onload = ()=>{ TOWN[n] = im; };
   im.src = "sprites/town/" + n + ".png";
@@ -735,6 +738,8 @@ const SHEET_NAMES = ["girl","dog","moka","mike","kerota","penta","tonko","meeko"
   /* v10 うらまちの住民 */
   "kitsune-shoji","hebi-mulch","tanuki-fudosan","karasu-shichiya","itachi-uranai","buta-shacho","nezumi-joho","ookami-yojinbo",
   "nora-shiro","nora-buchi","nora-kuro","gensan","sencho",
+  /* v14 善と悪の住民 */
+  "omawari-ken","keiji-torres","bainin-doku",
   /* v6 新住民30体 */
   "konta","ponkichi","ririsu","paopao","koaran","hamujiro","harry","ho-chan","ga-ko","meemee",
   "mo-san","poniko","chuta","mogurin","kawacchi","flamie","kumagoro","pakarun","rakkosuke","kamekichi",
@@ -928,12 +933,20 @@ let playerName = "", dogName = "", raceWins = 0, dogBreed = "shiba", promised = 
 /* --- おせわ指数（オンラインランキング） --- */
 const RANK_API = "https://wanko-rank.ai-fudosan.workers.dev";
 let careScore = 0, playerId = "", lastPlayDay = "";
+/* --- v14：ヒーロー度（わるい誘いを断る・通報すると上がる 善の指数） --- */
+let heroScore = 0;
+function addHero(n){
+  heroScore = Math.max(0, Math.min(9999, heroScore + n));
+  if(n > 0) floatTexts.push({x:player.x, y:player.y-30, text:`🦸 ヒーロー度+${n}`, t:1.8});
+  markSave();
+}
 let rankInfo = null, netDirty = true, netTimer = 5;
 /* --- まちのげんきど（0〜100）：お世話で上がり、実時間放置で下がる --- */
 let spirit = 45;   /* 新しい町は「ふつう」から育てていく */
 const spiritTier = ()=> spirit < 25 ? 0 : spirit < 60 ? 1 : spirit < 85 ? 2 : 3;
 /* おきゃくさまは きらきらの町にだけ・新住民は元気度が上がると引っこしてくる */
-const vActive = v => v.tourist ? spiritTier() >= 3
+const vActive = v => v.jailed ? false
+                   : v.tourist ? spiritTier() >= 3
                    : v.minSpirit ? spirit >= v.minSpirit
                    : true;
 function addCare(n){
@@ -1013,7 +1026,7 @@ function doSave(){
       lastBlessDay, toucho, homeLevel, loanLeft, lastLoanDay, kabuP, kabuH, lastKabuDay, kabukiBuff,
       noraFed, rumors,
       foodStock, medCount, care, poops, savedAt: Date.now(),
-      careScore, playerId, lastPlayDay, spirit, tut: tutStep, promised, lastSeenVer, scamLoss,
+      careScore, playerId, lastPlayDay, spirit, tut: tutStep, promised, lastSeenVer, scamLoss, heroScore,
       apple:pocket.apple, fossil:pocket.fossil,
       fishInv, bugInv,
       caughtFish:[...caughtFish], caughtBug:[...caughtBug],
@@ -1047,6 +1060,7 @@ function loadSave(){
     promised = d.promised != null ? d.promised : !!d.playerName;  /* 名前登録ずみなら約束ずみ扱い */
     lastSeenVer = d.lastSeenVer || "";
     scamLoss = d.scamLoss || 0;
+    heroScore = d.heroScore || 0;
     foodStock = d.foodStock||0; medCount = d.medCount||0;
     if(d.care) Object.assign(care, d.care);
     if(!playerName) care.stage = "puppy";               /* はじめてなら こいぬから */
@@ -1239,6 +1253,15 @@ const FUJI_DECO = [   /* [画像, 中心x, 足元y, solid?] */
   ["yuki-patch",   34, 3.5], ["yuki-patch", 46, 3.2], ["yuki-patch", 42, 6.5]
 ];
 for(const d of FUJI_DECO) if(d[3]) solid[Math.floor(d[2])][Math.floor(d[1])]=true;
+/* まちの善と悪（v14・西どおりの官公庁）：警察署・病院・学校 */
+const V14_DECO = [   /* [画像, 中心x, 足元y] */
+  ["police-hq",  10.5, 48.2],
+  ["patrol-car", 15.5, 48.0],
+  ["hospital",   21,   48.2],
+  ["school",     12,   62.5]
+];
+for(const [sx,sy,sw,sh] of [[8,46,5,2],[15,47,2,1],[18,46,6,2],[9,60,6,2]])
+  for(let y=sy;y<sy+sh;y++) for(let x=sx;x<sx+sw;x++) solid[y][x]=true;
 /* ほねずみ横丁（v13・わん座どおりの南のスラム）としおかぜ湊（東のはま） */
 const SLUM_SOLIDS = [[116,94,2,2],[126,96,2,2],[120,99,1,1],[119,104,1,1],[124,103,1,1],[116,101,1,1]];
 for(const [sx,sy,sw,sh] of SLUM_SOLIDS) for(let y=sy;y<sy+sh;y++) for(let x=sx;x<sx+sw;x++) solid[y][x]=true;
@@ -1416,6 +1439,17 @@ const V13_RESIDENTS = [
 for(const [key,name,tag,tx,ty,pitch,lines] of V13_RESIDENTS){
   VILLAGERS.push({ name, key, tag, pitch, lines,
     img: makeVillager(HEAD_BEAR, {s:"#c9a67a", m:"#e8d4b0", T:"#9a8a7a", t:"#c4b4a4"}),
+    hx:tx*T, hy:ty*T });
+}
+/* v14：まちの善と悪 */
+const V14_RESIDENTS = [
+ ["omawari-ken","おまわりケン","#4a6ab0", 13.5,50.5, 480,["この町の平和は、おれが守る！","こまったことがあったら 110番だぞ","うまい話には ワナがある。あやしいと思ったら通報だ！"]],
+ ["keiji-torres","刑事トラ次郎","#c9a03a", 92.5,52.5, 300,["…この町に、わるい“ブツ”が出回ってるらしい","（じっと目を見てくる）…きみは、シロだな","証拠がそろえば、いつでもしょっぴける"]],
+ ["bainin-doku","ドク","#8a6ab0", 106.5,57.5, 260,["…ヘヘ。にいちゃん、“いいもの”あるぜ","一度ためせば やめられなくなる…","（フードの奥で目が光った）"]]
+];
+for(const [key,name,tag,tx,ty,pitch,lines] of V14_RESIDENTS){
+  VILLAGERS.push({ name, key, tag, pitch, lines,
+    img: makeVillager(HEAD_BEAR, {s:"#c9a67a", m:"#e8d4b0", T:"#8a8a9a", t:"#b3b3c4"}),
     hx:tx*T, hy:ty*T });
 }
 for(const [key,name,tag,tx,ty,pitch,lines] of URA_RESIDENTS){
@@ -1762,6 +1796,7 @@ function startDialog(v){
       if(rumors.casino) pool.push("カジノで大勝ちしたってうわさ、ほんとなの！？");
       if(rumors.ukeko) pool.push("…受け子でつかまりかけたって聞いたよ。うまい話はダメだよ？");
       if(rumors.fukkou) pool.push("ほねずみ横丁、見ちがえたね！ あなたがやったんだって？");
+      if(rumors.taiho) pool.push("うらまちの売人がタイホされたって！ 通報したの、あなたなんだって？ かっこいい！");
       if(weather==="ame") pool.push("雨の日のお散歩もいいけど、帰ったら足ふいてあげてね");
       if(weather==="yuki") pool.push("ゆき〜！ 犬はよろこび庭かけまわる〜♪");
       if(weather==="kiri") pool.push("霧がふかいね。はぐれないようにね");
@@ -2346,6 +2381,7 @@ function toggleBook(){
     <div class="row"><span class="nm">🏘 町の住民</span><span>${VILLAGERS.filter(v=>!v.tourist && vActive(v)).length}人／${VILLAGERS.filter(v=>!v.tourist).length}人 <small class="muted">（元気度で増える）</small></span></div>
     <div class="row"><span class="nm">⏰ 前のお散歩から</span><span>${fmtAbsence(lastAbsenceH)}</span></div>
     <div class="row"><span class="nm">🏅 お世話指数</span><span class="bells">${careScore}${rankInfo&&rankInfo.rank?`（${rankInfo.rank}位/${rankInfo.total}人）`:""}</span></div>
+    <div class="row"><span class="nm">🦸 ヒーロー度</span><span class="bells">${heroScore} <small class="muted">（わるい誘いを断る・通報で上がる）</small></span></div>
     <div class="row"><span class="nm">🦴 化石</span><span>${pocket.fossil}</span></div>`;
   bookPanel.style.display = "block";
 }
@@ -3089,7 +3125,7 @@ function drawCasino(){
 }
 
 /* ================= うらまち：勧誘・おしごと・アトラクション（v10） ================= */
-const SCAMMERS = {"kitsune-shoji":1, "hebi-mulch":1, "nezumi-joho":1, "itachi-uranai":1};
+const SCAMMERS = {"kitsune-shoji":1, "hebi-mulch":1, "nezumi-joho":1, "itachi-uranai":1, "bainin-doku":1};
 let scamLoss = 0, scamCool = 75, job = null;
 function pay(c){
   if(bells < c){ floatTexts.push({x:player.x, y:player.y-20, text:`${c}ベルが必要…`, t:1.4}); return false; }
@@ -3110,6 +3146,33 @@ function openJobBoard(){
   popSound();
 }
 const URA_SPOTS = [
+  /* v14：西どおりの官公庁 */
+  {x:21,   y:49,   r:58, label:"🏥 わんこ総合病院（200ベルで全回復）", f:()=>{
+    if(!care.sick && care.hunger >= 90){ popup = { text:`🏥 シロ先生「うん、${dName()}はとても健康！ また来てね」`, t:3.4 }; return; }
+    if(pay(200)){
+      care.sick = false; care.sickT = 0; care.hunger = 100;
+      dog.happyT = 4; jingle();
+      popup = { text:`🏥 シロ先生とモモ看護師が てきぱき診察…${dName()}は すっかり元気！（病気もおなかも全回復）`, t:4.6 };
+    }
+  }},
+  {x:10.5, y:49,   r:52, label:"🚓 警察署（防犯のお話）", f:()=>{
+    const tips = [
+      "「うまい話には ワナがある。『絶対もうかる』は ぜんぶウソだ！」",
+      "「『だれにも言うな』って言われたら、それは わるいこと。すぐ大人に相談だ」",
+      "「あやしい売人を見たら、買わない・さわらない・110番！ だ」",
+      "「きみのヒーロー度は " + heroScore + " だな。わるい誘いを断るたびに上がるぞ！」"
+    ];
+    popup = { text:"👮 おまわりケン" + tips[Math.floor(Math.random()*tips.length)], t:4.6 };
+  }},
+  {x:12,   y:63.5, r:52, label:"🏫 小学校（ぼうはん教室）", f:()=>{
+    const lessons = [
+      "🏫 きょうの授業：『しらない人から もらわない・買わない・ついていかない』",
+      "🏫 きょうの授業：『からだに悪いものは 一度でもダメ。ぜったいダメ』",
+      "🏫 きょうの授業：『こまったら 110番。はずかしいことじゃないよ』"
+    ];
+    addCare(2);
+    popup = { text: lessons[Math.floor(Math.random()*lessons.length)] + "（指数+2）", t:4.4 };
+  }},
   {x:88.5, y:46.4, r:42, label:"📋 おしごと掲示板", f:openJobBoard},
   {x:100,  y:69,   r:70, label:"🎭 わん座（観劇300ベル）", f:()=>ride(300, 8, "🎭 隈取りのしば犬が見得を切った！ 大向こうから「わんや！」")},
   {x:90.5, y:123,  r:60, label:"♨ 旅館の湯（300ベル）", f:()=>{ if(pay(300)){ care.growth+=15; checkGrowth(); addCare(10); splash(); dog.happyT=4; popup={text:`♨ 極楽の湯…${dName()}は頭にタオルをのせて とろっとろ（指数+10）`,t:3.8}; } }},
@@ -3118,7 +3181,7 @@ const URA_SPOTS = [
   {x:122,  y:145,  r:54, label:"👻 お化け屋敷（250ベル）", f:()=>ride(250, 6, "👻 こわかわいい おばけがいっぱいだった…")}
 ];
 /* --- 勧誘イベント：ぜんぶが詐欺とはかぎらない。見抜けるか？ --- */
-let scamV = null, scamOffer = null;
+let scamV = null, scamOffer = null, arrestFx = null;
 function openScam(v){
   uiOpen();
   scamV = v;
@@ -3160,6 +3223,15 @@ function openScam(v){
     body = `
       <div>「ふふ…あなたの明日、<b>水晶玉</b>にうつってるわ。<b>500ベル</b>で見せてあげる」</div>
       <div class="row"><button data-scam="go" ${bells>=500?"":"disabled"} style="flex:1;">占ってもらう（500ベル）</button></div>`;
+  }else if(v.key==="bainin-doku"){
+    /* v14：危険物の売人。買う＝かならず大失敗／断る・通報＝ヒーロー度が上がる */
+    const goods = Math.random()<0.5 ? "🚬 ゾンビタバコ" : "💊 あやしいクスリ";
+    scamOffer = { type:"doku", genuine:false, cost:800, goods };
+    body = `
+      <div>「…ヘヘ。${goods}、あるぜ。<b>一度ためせば</b>いやなこと ぜんぶ忘れられる…<b>800ベル</b>でいい」</div>
+      <div class="muted" style="font-size:11px;">（からだに悪いものは、一度でもぜったいダメ！）</div>
+      <div class="row"><button data-scam="go" ${bells>=800?"":"disabled"} style="flex:1;">買う（800ベル）</button></div>
+      <div class="row"><button data-scam="tsuho" style="flex:1; background:#4a6ab0;">📞 110番に通報する</button></div>`;
   }
   sp.innerHTML = `<h2>${v.name}が近づいてきた…</h2>` + body +
     `<div class="row"><button data-scam="refuse" style="flex:1; background:#8a9a8a;">きっぱり断る</button></div>`;
@@ -3171,8 +3243,30 @@ document.getElementById("scamPanel").addEventListener("click", e=>{
   const sp = document.getElementById("scamPanel");
   sp.style.display = "none"; uiClose();
   const o = scamOffer;
+  if(k==="tsuho" && o.type==="doku"){
+    /* v14：110番通報 → おまわりケンが急行して逮捕！ */
+    const doku = scamV;
+    popup = { text:"📞 110番した！「うらまちに あやしい売人が…！」", t:1.8 };
+    setTimeout(()=>{
+      popup = { text:"🚓 ピーポーピーポー！ おまわりケンが急行してきた！", t:1.8 };
+      noiseSfx(0.25, 0.08, 900, 300);
+      if(doku) arrestFx = { x:doku.x, y:doku.y, t:3.2 };
+    }, 1900);
+    setTimeout(()=>{
+      if(doku){ doku.jailed = true; }
+      rumors.taiho = true;
+      addHero(20); addCare(10); fanfare();
+      popup = { text:`🚨 おまわりケン「ご協力ありがとう！ ドクはタイホだ！」…町がすこし平和になった（🦸ヒーロー度+20・指数+10）`, t:6 };
+      markSave();
+    }, 3900);
+    scamV = null; scamOffer = null;
+    return;
+  }
   if(k==="refuse"){
-    if(o.genuine === true){
+    if(o.type === "doku"){
+      addHero(5); addCare(5); jingle();
+      popup = { text:"🙅「ぜったい いらない！」…からだに悪いものは一度でもダメ。りっぱ！（🦸ヒーロー度+5・指数+5）", t:4.6 };
+    }else if(o.genuine === true){
       popup = { text:"…ていねいに断った。（あれ、いま思うと本物のお得だったかも…？）", t:3.8 };
     }else if(o.type === "ukeko"){
       addCare(8); jingle();
@@ -3218,6 +3312,19 @@ document.getElementById("scamPanel").addEventListener("click", e=>{
         scamLoss += 500;
         popup = { text:"🐭『情報は生ものだからね』…なにも見つからなかった（-500ベル）", t:4 };
       }
+    }else if(o.type==="doku" && pay(800)){
+      /* 買うと かならず大失敗：刑事に見つかって没収＋罰金。手元にはなにも残らない */
+      scamLoss += 800;
+      popup = { text:`${o.goods}を買ってしまった…`, t:1.6 };
+      setTimeout(()=>{
+        const fine = Math.min(300, bells);
+        bells -= fine;
+        addHero(-15);
+        careScore = Math.max(0, careScore - 5); netDirty = true;
+        popup = { text:`🕶 トラ次郎「待て。それは持ってるだけでアウトだ」…その場で没収された。罰金${fine}ベル（🦸ヒーロー度-15・指数-5）。からだに悪いものは、買ってもいいことが1つもない`, t:6.5 };
+        noiseSfx(0.25, 0.08, 700, 200);
+        markSave();
+      }, 1800);
     }else if(o.type==="uranai" && pay(500)){
       const r = Math.random();
       if(r < 0.3){ addCare(5); popup = { text:"🔮「大吉よ！」なんだか元気が出た（お世話指数+5）", t:3.6 }; jingle(); }
@@ -3227,6 +3334,14 @@ document.getElementById("scamPanel").addEventListener("click", e=>{
   }
   markSave();
   scamV = null; scamOffer = null;
+});
+
+/* --- v14：善と悪の小物（逮捕フラッシュなど） --- */
+const V14_IMG = {};
+[["danger","taiho-flash"],["danger","hero-kirakira"],["law","tenbin"]].forEach(([cat,n])=>{
+  const im = new Image();
+  im.onload = ()=>{ V14_IMG[n] = im; };
+  im.src = "sprites/items/" + cat + "/" + n + ".png";
 });
 
 /* ================= わんこ富士・わん株・マイホーム・わん座演目（v12） ================= */
@@ -3894,6 +4009,7 @@ function update(dt){
     navTarget = null;
   }
   if(engiShow){ engiShow.t -= dt; if(engiShow.t <= 0) engiShow = null; }
+  if(arrestFx){ arrestFx.t -= dt; if(arrestFx.t <= 0) arrestFx = null; }
 
   /* --- 勧誘タイマー：ときどき あやしい人が寄ってくる（うらまちでは3倍） --- */
   if(tutStep >= TUT_STEPS.length){
@@ -4608,6 +4724,22 @@ function drawWorld(){
       if(im) ctx.drawImage(im, Math.round(cx2*T - im.width/2), Math.round(by2*T - im.height));
     }});
   }
+  /* まちの善と悪（v14）：警察署・病院・学校・パトカー */
+  for(const [n,cx2,by2] of V14_DECO){
+    items.push({y:by2*T, f:()=>{
+      const im = TOWN[n];
+      if(im) ctx.drawImage(im, Math.round(cx2*T - im.width/2), Math.round(by2*T - im.height));
+    }});
+  }
+  if(arrestFx){
+    items.push({y:arrestFx.y+40, f:()=>{
+      const im = V14_IMG["taiho-flash"];
+      const blink = Math.sin(time*14) > 0;
+      if(im && blink) ctx.drawImage(im, Math.round(arrestFx.x - im.width/2), Math.round(arrestFx.y - 46 - im.height));
+      ctx.fillStyle = blink ? "rgba(230,60,70,0.28)" : "rgba(60,90,230,0.28)";
+      ctx.beginPath(); ctx.ellipse(arrestFx.x, arrestFx.y+2, 26, 12, 0, 0, 7); ctx.fill();
+    }});
+  }
   /* ほねずみ横丁（復興ステージで見た目がかわる） */
   {
     const st = slumStage();
@@ -5202,6 +5334,7 @@ const NAV_SPOTS = [
   ["☕ わんカフェ", 64, 57], ["📋 おしごと掲示板", 88, 46], ["🏮 うらまち横丁", 95, 50],
   ["🎭 わん座", 100, 67], ["♨ 旅館の湯", 90, 122], ["🎡 わんダーランド", 114, 143],
   ["📈 わん株取引所", 122, 61], ["🏠 ポン蔵不動産", 87, 65],
+  ["🚓 警察署", 10, 48], ["🏥 わんこ総合病院", 21, 48], ["🏫 小学校", 12, 62],
   ["🌈 にじのはしパーク", 14, 114], ["⛩ わんこ富士さんちょう", 36, 6],
   ["🎣 さんばし（湖づり）", 40, 114], ["🌊 すなはま（海づり）", 40, 160]
 ];
@@ -5566,6 +5699,8 @@ window.__G = { player, dog, VILLAGERS, trees, pocket, fishInv, bugInv, groundIte
   setNav:(label,x,y)=>{ navTarget = {label,x,y}; }, getNav:()=>navTarget, NAV_SPOTS, mapTapNav,
   feedNora, noraFed, rumors, slumStage, fukkoudo, openMarket, ferry,
   get careScore(){ return careScore; },
+  get heroScore(){ return heroScore; }, addHero,
+  get arrestFx(){ return arrestFx; },
   get rankInfo(){ return rankInfo; },
   toggleMap:()=>{ mapOpen = !mapOpen; },
   get mapOpen(){ return mapOpen; },
